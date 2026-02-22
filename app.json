@@ -1,12 +1,21 @@
 {
   "expo": {
-    "name": "quran-app-premium",
+    "name": "آيات - القرآن الكريم",
     "slug": "quran-app-premium",
-    "version": "1.0.0",
+    "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "updates": {
+      "url": "https://u.expo.dev/7ac7a663-bd7f-4d1d-b01a-68ea92361c57",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -16,6 +25,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.mouad.quranpremium",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -25,6 +35,24 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "7ac7a663-bd7f-4d1d-b01a-68ea92361c57"
+      }
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraMavenRepos": [],
+            "extraProperties": {
+              "AsyncStorage_db_size_in_MB": 50
+            }
+          }
+        }
+      ]
+    ]
   }
 }
