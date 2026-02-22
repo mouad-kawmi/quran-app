@@ -8,6 +8,12 @@
 Une application Coranique premium et riche en fonctionnalités, construite avec React Native et Expo. Conçue avec un accent particulier sur l'esthétique, la facilité d'utilisation et une expérience de lecture spirituelle.
 
 <p align="center">
+  <a href="https://github.com/mouad-kawmi/quran-app/releases/latest">
+    <img src="https://img.shields.io/badge/Télécharger-APK_Direct-081C15?style=for-the-badge&logo=android&logoColor=white" alt="Télécharger APK">
+  </a>
+</p>
+
+<p align="center">
   <img src="./assets/screen.jpeg" width="300" alt="Quran Premium Aperçu">
 </p>
 
