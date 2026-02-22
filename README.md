@@ -5,63 +5,63 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-A premium, feature-rich Quran application built with React Native and Expo. Designed with a focus on aesthetics, ease of use, and a spiritual reading experience.
+Une application Coranique premium et riche en fonctionnalités, construite avec React Native et Expo. Conçue avec un accent particulier sur l'esthétique, la facilité d'utilisation et une expérience de lecture spirituelle.
 
-![App Preview](https://via.placeholder.com/800x400.png?text=Quran+Premium+Preview)
+![Aperçu de l'application](https://via.placeholder.com/800x400.png?text=Quran+Premium+Aperçu)
 
-## ✨ Features
+## ✨ Fonctionnalités
 
-- **📜 Spiritual Reading Experience:** Beautiful parchment-inspired theme for reduced eye strain and a classic Feel.
-- **🕋 Advanced Qibla Compass:** Smooth, animated compass with calibration guides and exact heading.
-- **📅 Khatma Tracker:** Personalized reading plans (7, 15, 30 days) with progress tracking.
-- **☀️ Daily Adhkar:** Morning and Evening remembrances with professional notifications.
-- **🎧 Audio Playback:** Listen to your favorite reciters with offline detection logic.
-- **🔍 Smart Search:** Quickly find any Surah or Ayah in Arabic or English.
-- **🌙 Dual Themes:** Switch between Premium Parchment (Light) and Deep Emerald (Dark) modes.
-- **📲 Over-The-Air (OTA) Updates:** Receive the latest features and fixes instantly without downloading new APKs.
+- **📜 Expérience de lecture spirituelle :** Thème inspiré du parchemin pour réduire la fatigue oculaire et offrir un ressenti classique.
+- **🕋 Boussole Qibla Avancée :** Boussole animée fluide avec guides d'étalonnage et direction précise.
+- **📅 Suivi de Khatma :** Plans de lecture personnalisés (7, 15, 30 jours) avec suivi de progression.
+- **☀️ Rappels d'Adhkar :** Souvenirs du matin et du soir avec notifications professionnelles.
+- **🎧 Lecture Audio :** Écoutez vos récitateurs préférés avec une logique de détection hors ligne.
+- **🔍 Recherche Intelligente :** Trouvez rapidement n'importe quelle Sourate ou Ayah en arabe ou en français/anglais.
+- **🌙 Thèmes Dynamiques :** Basculez entre le mode Parchemin Premium (Clair) et Émeraude Profond (Sombre).
+- **📲 Mises à jour Over-The-Air (OTA) :** Recevez instantanément les dernières fonctionnalités et correctifs sans avoir à télécharger de nouveaux APK.
 
-## 🛠️ Technology Stack
+## 🛠️ Stack Technique
 
-- **Framework:** React Native / Expo
-- **Language:** TypeScript
-- **Styling:** Flexbox / Dynamic Theme Engine
-- **Icons:** Lucide React Native
-- **Storage:** Expo SQLite / AsyncStorage
-- **Notifications:** Expo Notifications
-- **Deployment:** EAS (Expo Application Services)
+- **Framework :** React Native / Expo
+- **Langage :** TypeScript
+- **Style :** Flexbox / Moteur de thèmes dynamiques
+- **Icônes :** Lucide React Native
+- **Stockage :** Expo SQLite / AsyncStorage
+- **Notifications :** Expo Notifications
+- **Déploiement :** EAS (Expo Application Services)
 
-## 🚀 Getting Started
+## 🚀 Mise en route
 
-### Prerequisites
+### Prérequis
 
 - Node.js (v18+)
-- Expo Go app on your physical device
+- Application Expo Go sur votre appareil physique
 
 ### Installation
 
-1. Clone the repository:
+1. Cloner le dépôt :
    ```bash
-   git clone https://github.com/mouadkawmi/quran-app-premium.git
+   git clone https://github.com/mouad-kawmi/quran-app.git
    ```
 
-2. Install dependencies:
+2. Installer les dépendances :
    ```bash
    npm install
    ```
 
-3. Start the development server:
+3. Démarrer le serveur de développement :
    ```bash
    npx expo start
    ```
 
-## 📦 Deployment & Updates
+## 📦 Déploiement et Mises à jour
 
-This app uses **EAS Update** for seamless deployments.
+Cette application utilise **EAS Update** pour des déploiements fluides.
 
-- **To publish a new update:**
+- **Pour publier une nouvelle mise à jour :**
   ```bash
-  eas update --branch production --message "Describe your changes"
+  eas update --branch production --message "Décrivez vos changements"
   ```
 
 ---
-Developed with ❤️ for the Ummah.
+Développé avec ❤️ pour la Ummah.
