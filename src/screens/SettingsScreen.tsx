@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Switch, Alert } from 'react-native';
 import { Translations } from '../constants/Translations';
 import { Colors } from '../constants/Colors';
@@ -5,6 +6,8 @@ import { Storage } from '../utils/storage';
 import { Trash2, X, Bell, ShieldCheck, Clock, Sun, BookOpen } from 'lucide-react-native';
 import * as Notifications from 'expo-notifications';
 import { NotificationService } from '../utils/notificationService';
+import { Download, CheckCircle, Loader2 } from 'lucide-react-native';
+import axios from 'axios';
 
 interface Props {
     lang: string;
@@ -15,6 +18,45 @@ interface Props {
 
 const SettingsScreen = ({ lang, theme, onToggleLang, onToggleTheme }: Props) => {
     const t = Translations[lang];
+    const [isDownloading, setIsDownloading] = useState(false);
+    const [downloadProgress, setDownloadProgress] = useState(0);
+    const [isDownloaded, setIsDownloaded] = useState(false);
+
+    useEffect(() => {
+        checkDownloadStatus();
+    }, []);
+
+    const checkDownloadStatus = async () => {
+        const fullSync = await Storage.isFullSynced();
+        setIsDownloaded(fullSync);
+    };
+
+    const handleDownloadAll = async () => {
+        if (isDownloading) return;
+
+        setIsDownloading(true);
+        setDownloadProgress(0);
+
+        try {
+            for (let i = 1; i <= 30; i++) {
+                // Fetch Juz
+                const response = await axios.get(`https://api.alquran.cloud/v1/juz/${i}/quran-uthmani`, { timeout: 15000 });
+                if (response.data && response.data.data) {
+                    await Storage.saveJuzCache(i, response.data.data.ayahs);
+                }
+                setDownloadProgress(Math.round((i / 30) * 100));
+            }
+            await Storage.setFullSync(true);
+            setIsDownloaded(true);
+            Alert.alert(lang === 'ar' ? "تم التحميل" : "Download Complete", lang === 'ar' ? "تم تحميل المصحف كاملاً بنجاح." : "Full Quran downloaded successfully.");
+        } catch (error) {
+            console.error("Download failed:", error);
+            Alert.alert(lang === 'ar' ? "خطأ" : "Error", lang === 'ar' ? "فشل التحميل. يرجى التأكد من الإنترنت والمساحة." : "Download failed. Please check internet and storage.");
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
     const isDark = theme === 'dark';
     const handleResetApp = () => {
         Alert.alert(
@@ -107,6 +149,40 @@ const SettingsScreen = ({ lang, theme, onToggleLang, onToggleTheme }: Props) => 
                     <TouchableOpacity style={[styles.toggleBtn, { backgroundColor: '#ff4444' }]} onPress={handleClearCache}>
                         <Trash2 size={20} color="#fff" />
                     </TouchableOpacity>
+                </View>
+
+                {/* Full Offline Download */}
+                <View style={[styles.downloadCard, { backgroundColor: isDownloaded ? 'rgba(76, 175, 80, 0.1)' : activeColors.surface, borderColor: isDownloaded ? '#4CAF50' : activeColors.surfaceLight }]}>
+                    <View style={styles.downloadHeader}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={[styles.downloadTitle, { color: activeColors.text }]}>
+                                {lang === 'ar' ? 'تحميل المصحف كاملاً' : 'Full Quran Download'}
+                            </Text>
+                            <Text style={[styles.downloadSub, { color: activeColors.textMuted }]}>
+                                {isDownloaded
+                                    ? (lang === 'ar' ? 'التطبيق جاهز للعمل بدون إنترنت' : 'App is ready for offline use')
+                                    : (lang === 'ar' ? 'حمل المصحف للاستمرار بدون إنترنت' : 'Download for offline use')}
+                            </Text>
+                        </View>
+                        {isDownloaded ? (
+                            <CheckCircle size={24} color="#4CAF50" />
+                        ) : isDownloading ? (
+                            <View style={styles.loaderBox}>
+                                <Text style={[styles.progressText, { color: Colors.secondary }]}>{downloadProgress}%</Text>
+                            </View>
+                        ) : (
+                            <TouchableOpacity style={[styles.downloadBtn, { backgroundColor: Colors.secondary }]} onPress={handleDownloadAll}>
+                                <Download size={20} color={Colors.dark.background} />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                    {isDownloading && (
+                        <View style={styles.progressContainer}>
+                            <View style={[styles.progressBarBg, { backgroundColor: activeColors.surfaceLight }]}>
+                                <View style={[styles.progressBarFill, { width: `${downloadProgress}%`, backgroundColor: Colors.secondary }]} />
+                            </View>
+                        </View>
+                    )}
                 </View>
 
                 <View style={styles.sectionTitleBox}>
@@ -231,6 +307,16 @@ const styles = StyleSheet.create({
     testButtonsRow: { flexDirection: 'row', justifyContent: 'space-between' },
     testIconBtn: { flex: 1, marginHorizontal: 5, paddingVertical: 15, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
     testBtnLabel: { fontSize: 11, fontWeight: 'bold', marginTop: 8 },
+    downloadCard: { padding: 20, borderRadius: 20, marginBottom: 20, borderWidth: 1 },
+    downloadHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    downloadTitle: { fontSize: 16, fontWeight: 'bold' },
+    downloadSub: { fontSize: 12, marginTop: 4 },
+    downloadBtn: { width: 45, height: 45, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+    progressContainer: { marginTop: 15 },
+    progressBarBg: { height: 6, borderRadius: 3, overflow: 'hidden' },
+    progressBarFill: { height: '100%', borderRadius: 3 },
+    loaderBox: { alignItems: 'center', justifyContent: 'center' },
+    progressText: { fontSize: 14, fontWeight: 'bold' }
 });
 
 export default SettingsScreen;

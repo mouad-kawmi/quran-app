@@ -82,17 +82,17 @@ const HomeScreen = ({ onSelectSurah, lang, theme, refreshTrigger }: Props) => {
 
         setIsSyncing(true);
         let count = 0;
+        const totalItems = surahList.length + 30; // 114 Surahs + 30 Juzs
 
         // Helper to add delay
         const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
+        // 1. Sync Surahs
         for (const surah of surahList) {
             try {
                 const cached = await Storage.getSurahCache(surah.number);
                 if (!cached) {
                     const fullDetails = await fetchSurahDetail(surah.number);
-                    // Critical Fix: Keep essential fields for SurahDetailScreen to prevent crashes
-                    // Extra Compression: Shorten keys to save space (SQLITE_FULL fix)
                     const minimizedDetails = fullDetails.map((edition: any) => ({
                         e: { id: edition.edition.identifier },
                         a: edition.ayahs.map((a: any) => ({
@@ -102,20 +102,39 @@ const HomeScreen = ({ onSelectSurah, lang, theme, refreshTrigger }: Props) => {
                         }))
                     }));
                     await Storage.saveSurahCache(surah.number, minimizedDetails);
-                    await delay(300);
+                    await delay(200);
                 }
                 count++;
-                setSyncProgress(Math.floor((count / surahList.length) * 100));
+                setSyncProgress(Math.floor((count / totalItems) * 100));
             } catch (e) {
-                console.log(`Sync skipped for Surah ${surah.number} (will retry next time)`, e);
-                // Don't stop the whole process, just skip this one for now
+                console.log(`Sync skipped for Surah ${surah.number}`, e);
                 count++;
                 continue;
             }
         }
 
-        // Only set full sync if we actually finished everything (optional)
-        if (count === surahList.length) {
+        // 2. Sync Juzs (Crucial for Offline Khatma)
+        for (let j = 1; j <= 30; j++) {
+            try {
+                const cachedJuz = await Storage.getJuzCache(j);
+                if (!cachedJuz) {
+                    const response = await fetch(`https://api.alquran.cloud/v1/juz/${j}/quran-uthmani`);
+                    const resJson = await response.json();
+                    if (resJson.data && resJson.data.ayahs) {
+                        await Storage.saveJuzCache(j, resJson.data.ayahs);
+                        await delay(200);
+                    }
+                }
+                count++;
+                setSyncProgress(Math.floor((count / totalItems) * 100));
+            } catch (e) {
+                console.log(`Sync skipped for Juz ${j}`, e);
+                count++;
+                continue;
+            }
+        }
+
+        if (count >= totalItems) {
             await Storage.setFullSync(true);
         }
         setIsSyncing(false);

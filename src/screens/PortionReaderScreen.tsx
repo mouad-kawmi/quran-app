@@ -2,8 +2,10 @@ import * as React from 'react';
 import { useEffect, useState, useRef } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, SafeAreaView, TouchableOpacity, Alert } from 'react-native';
 import axios from 'axios';
-import { saveBookmark } from '../api/bookmarksStore';
+import { Storage } from '../utils/storage';
 import { Colors } from '../constants/Colors';
+import { WifiOff, ChevronLeft } from 'lucide-react-native';
+import { Translations } from '../constants/Translations';
 
 const PortionReaderScreen = ({ juzList, onComplete, onBack, lang, theme }: any) => {
     const [ayahs, setAyahs] = useState<any[]>([]);
@@ -24,13 +26,30 @@ const PortionReaderScreen = ({ juzList, onComplete, onBack, lang, theme }: any) 
     const loadJuz = async (juzNum: number) => {
         setLoading(true);
         try {
-            const response = await axios.get(`https://api.alquran.cloud/v1/juz/${juzNum}/quran-uthmani`);
+            // 1. Check Cache first
+            const cached = await Storage.getJuzCache(juzNum);
+            if (cached) {
+                setAyahs(cached);
+                ayahsRef.current = cached;
+                if (cached.length > 0) {
+                    const firstPage = cached[0].page;
+                    const lastPage = cached[cached.length - 1].page;
+                    setTotalPagesInJuz(lastPage - firstPage + 1);
+                }
+                setLoading(false);
+                return;
+            }
+
+            // 2. Fetch from API
+            const response = await axios.get(`https://api.alquran.cloud/v1/juz/${juzNum}/quran-uthmani`, { timeout: 10000 });
             if (response.data && response.data.data) {
                 const fetchedAyahs = response.data.data.ayahs;
                 setAyahs(fetchedAyahs);
                 ayahsRef.current = fetchedAyahs;
 
-                // Calculate total pages in this juz
+                // Save to Cache
+                await Storage.saveJuzCache(juzNum, fetchedAyahs);
+
                 if (fetchedAyahs.length > 0) {
                     const firstPage = fetchedAyahs[0].page;
                     const lastPage = fetchedAyahs[fetchedAyahs.length - 1].page;
@@ -39,7 +58,9 @@ const PortionReaderScreen = ({ juzList, onComplete, onBack, lang, theme }: any) 
                 }
             }
         } catch (error) {
-            console.error(error);
+            console.error("Error loading Juz:", error);
+            // We'll handle showing the error in the render
+            setAyahs([]);
         } finally {
             setLoading(false);
         }
@@ -76,13 +97,25 @@ const PortionReaderScreen = ({ juzList, onComplete, onBack, lang, theme }: any) 
     }).current;
 
     const handleBookmark = async (item: any) => {
-        await saveBookmark({
-            surahNumber: item.surah.number,
-            surahName: item.surah.englishName,
-            ayahNumber: item.numberInSurah,
-            text: item.text
-        });
-        Alert.alert(lang === 'ar' ? "تم الحفظ" : "Saved", lang === 'ar' ? "تم حفظ الآية بنجاح." : "Ayah bookmarked successfully.");
+        const currentBookmarks = await Storage.getBookmarks();
+        const exists = currentBookmarks.find(b => b.surahNumber === item.surah.number && b.ayahNumber === item.numberInSurah);
+
+        if (!exists) {
+            const newBookmark = {
+                surahNumber: item.surah.number,
+                surahName: item.surah.name,
+                ayahNumber: item.numberInSurah,
+                text: item.text,
+                date: new Date().toISOString()
+            };
+            const updated = [...currentBookmarks, newBookmark];
+            await Storage.saveBookmarks(updated);
+            Alert.alert(lang === 'ar' ? "تم الحفظ" : "Saved", lang === 'ar' ? "تم حفظ الآية بنجاح." : "Ayah bookmarked successfully.");
+        } else {
+            const filtered = currentBookmarks.filter(b => !(b.surahNumber === item.surah.number && b.ayahNumber === item.numberInSurah));
+            await Storage.saveBookmarks(filtered);
+            Alert.alert(lang === 'ar' ? "تم الإزالة" : "Removed", lang === 'ar' ? "تمت إزالة الآية من المحفوظات." : "Ayah removed from bookmarks.");
+        }
     };
 
     const renderAyah = ({ item, index }: any) => {
@@ -109,10 +142,43 @@ const PortionReaderScreen = ({ juzList, onComplete, onBack, lang, theme }: any) 
         );
     };
 
+    const t = Translations[lang];
+
     if (loading) {
         return (
             <View style={[styles.center, { backgroundColor: activeColors.background }]}>
                 <ActivityIndicator size="large" color={Colors.secondary} />
+            </View>
+        );
+    }
+
+    if (!loading && ayahs.length === 0) {
+        return (
+            <View style={[styles.container, { backgroundColor: activeColors.background }]}>
+                <View style={[styles.header, { backgroundColor: activeColors.surface }]}>
+                    <TouchableOpacity onPress={onBack} style={styles.backButton}>
+                        <ChevronLeft size={28} color={Colors.secondary} />
+                    </TouchableOpacity>
+                    <Text style={[styles.title, { color: activeColors.text }]}>{lang === 'ar' ? 'خطأ في التحميل' : 'Loading Error'}</Text>
+                    <View style={{ width: 40 }} />
+                </View>
+                <View style={styles.errorContainer}>
+                    <WifiOff size={60} color={activeColors.textMuted} style={{ marginBottom: 20 }} />
+                    <Text style={[styles.errorTitle, { color: activeColors.text }]}>
+                        {lang === 'ar' ? 'لا يوجد اتصال بالإنترنت' : 'No Internet Connection'}
+                    </Text>
+                    <Text style={[styles.errorSub, { color: activeColors.textMuted }]}>
+                        {lang === 'ar'
+                            ? 'هذا الجزء غير محمل مسبقاً. يرجى الاتصال بالإنترنت لتحميله مرة واحدة فقط.'
+                            : 'This portion is not downloaded. Please connect to the internet to download it once.'}
+                    </Text>
+                    <TouchableOpacity
+                        style={[styles.retryBtn, { backgroundColor: Colors.secondary }]}
+                        onPress={() => loadJuz(juzList[currentJuzIndex])}
+                    >
+                        <Text style={styles.retryBtnText}>{lang === 'ar' ? 'إعادة المحاولة' : 'Try Again'}</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         );
     }
@@ -186,7 +252,13 @@ const styles = StyleSheet.create({
     arabicText: { fontSize: 24, lineHeight: 45, textAlign: 'right' },
     footer: { paddingVertical: 40, alignItems: 'center' },
     btn: { paddingVertical: 15, paddingHorizontal: 35, borderRadius: 15, borderWidth: 1 },
-    btnText: { fontSize: 16, fontWeight: 'bold' }
+    btnText: { fontSize: 16, fontWeight: 'bold' },
+    errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+    errorTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' },
+    errorSub: { fontSize: 16, textAlign: 'center', lineHeight: 24, marginBottom: 30 },
+    retryBtn: { paddingVertical: 15, paddingHorizontal: 40, borderRadius: 15 },
+    retryBtnText: { color: Colors.dark.background, fontWeight: 'bold', fontSize: 16 },
+    backButton: { padding: 8 }
 });
 
 export default PortionReaderScreen;

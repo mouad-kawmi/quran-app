@@ -11,6 +11,7 @@ const KEYS = {
     SURAH_LIST: '@quran_premium_surah_list',
     PRAYER_TIMES: '@quran_premium_prayer_times',
     FULL_SYNC: '@quran_premium_full_sync',
+    JUZ_CACHE_PREFIX: '@quran_premium_juz_cache_',
 };
 
 export const Storage = {
@@ -67,6 +68,17 @@ export const Storage = {
     },
     async getSurahCache(surahNumber: number): Promise<any | null> {
         const key = KEYS.SURAH_CACHE_PREFIX + surahNumber;
+        const data = await AsyncStorage.getItem(key);
+        return data ? JSON.parse(data) : null;
+    },
+
+    // Juz Cache - For Khatma offline support
+    async saveJuzCache(juzNumber: number, data: any) {
+        const key = KEYS.JUZ_CACHE_PREFIX + juzNumber;
+        await AsyncStorage.setItem(key, JSON.stringify(data));
+    },
+    async getJuzCache(juzNumber: number): Promise<any | null> {
+        const key = KEYS.JUZ_CACHE_PREFIX + juzNumber;
         const data = await AsyncStorage.getItem(key);
         return data ? JSON.parse(data) : null;
     },

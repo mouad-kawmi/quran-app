@@ -108,39 +108,46 @@ export const NotificationService = {
         const isAr = lang === 'ar';
         const t = Translations[lang];
 
-        const now = new Date();
-
         for (const prayer of prayerKeys) {
             const timeStr = timings[prayer]; // Expected format "HH:mm"
             if (!timeStr) continue;
 
             const [hours, minutes] = timeStr.split(':').map(Number);
-            const prayerDate = new Date();
-            prayerDate.setHours(hours, minutes, 0, 0);
 
-            // 1. Notification at exact time
-            if (prayerDate > now) {
-                await Notifications.scheduleNotificationAsync({
-                    content: {
-                        title: isAr ? `حان الآن موعد صلاة ${t[prayer]}` : `It is now time for ${t[prayer]} prayer`,
-                        body: isAr ? `حي على الصلاة، حي على الفلاح` : `Come to prayer, come to success`,
-                        sound: true,
-                    },
-                    trigger: prayerDate as unknown as Notifications.NotificationTriggerInput,
-                });
+            // 1. Notification at exact time (Repeating daily)
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: isAr ? `حان الآن موعد صلاة ${t[prayer]}` : `It is now time for ${t[prayer]} prayer`,
+                    body: isAr ? `حي على الصلاة، حي على الفلاح` : `Come to prayer, come to success`,
+                    sound: true,
+                },
+                trigger: {
+                    hour: hours,
+                    minute: minutes,
+                    repeats: true
+                } as Notifications.NotificationTriggerInput,
+            });
+
+            // 2. Notification 5 minutes before (Repeating daily)
+            // Handle edge case where minutes < 5
+            let warnHours = hours;
+            let warnMinutes = minutes - 5;
+            if (warnMinutes < 0) {
+                warnMinutes += 60;
+                warnHours = (warnHours - 1 + 24) % 24;
             }
 
-            // 2. Notification 5 minutes before
-            const warningDate = new Date(prayerDate.getTime() - 5 * 60000);
-            if (warningDate > now) {
-                await Notifications.scheduleNotificationAsync({
-                    content: {
-                        title: isAr ? `اقترب موعد صلاة ${t[prayer]}` : `${t[prayer]} prayer is approaching`,
-                        body: isAr ? `بقي 5 دقائق على الأذان. استعد للصلاة.` : `5 minutes left until Adhan. Get ready for prayer.`,
-                    },
-                    trigger: warningDate as unknown as Notifications.NotificationTriggerInput,
-                });
-            }
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: isAr ? `اقترب موعد صلاة ${t[prayer]}` : `${t[prayer]} prayer is approaching`,
+                    body: isAr ? `بقي 5 دقائق على الأذان. استعد للصلاة.` : `5 minutes left until Adhan. Get ready for prayer.`,
+                },
+                trigger: {
+                    hour: warnHours,
+                    minute: warnMinutes,
+                    repeats: true
+                } as Notifications.NotificationTriggerInput,
+            });
         }
     }
 };
