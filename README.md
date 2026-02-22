@@ -7,27 +7,30 @@
 
 Une application Coranique premium et riche en fonctionnalités, construite avec React Native et Expo. Conçue avec un accent particulier sur l'esthétique, la facilité d'utilisation et une expérience de lecture spirituelle.
 
-![Aperçu de l'application](https://via.placeholder.com/800x400.png?text=Quran+Premium+Aperçu)
+<p align="center">
+  <img src="./assets/screen.jpeg" width="300" alt="Quran Premium Aperçu">
+</p>
 
 ## ✨ Fonctionnalités
 
-- **📜 Expérience de lecture spirituelle :** Thème inspiré du parchemin pour réduire la fatigue oculaire et offrir un ressenti classique.
-- **🕋 Boussole Qibla Avancée :** Boussole animée fluide avec guides d'étalonnage et direction précise.
-- **📅 Suivi de Khatma :** Plans de lecture personnalisés (7, 15, 30 jours) avec suivi de progression.
-- **☀️ Rappels d'Adhkar :** Souvenirs du matin et du soir avec notifications professionnelles.
-- **🎧 Lecture Audio :** Écoutez vos récitateurs préférés avec une logique de détection hors ligne.
-- **🔍 Recherche Intelligente :** Trouvez rapidement n'importe quelle Sourate ou Ayah en arabe ou en français/anglais.
-- **🌙 Thèmes Dynamiques :** Basculez entre le mode Parchemin Premium (Clair) et Émeraude Profond (Sombre).
-- **📲 Mises à jour Over-The-Air (OTA) :** Recevez instantanément les dernières fonctionnalités et correctifs sans avoir à télécharger de nouveaux APK.
+- **📜 Expérience de lecture hors ligne complète :** Téléchargez l'intégralité du Coran (par Sourate ou Juz) pour une lecture sans connexion internet.
+- **📅 Suivi de Khatma Intelligent :** Plans de lecture personnalisables (3, 7, 10, 30 jours) avec synchronisation hors ligne de votre progression.
+- **📜 Lecture Spirituelle :** Design premium avec des thèmes optimisés pour réduire la fatigue oculaire.
+- **🕋 Boussole Qibla Précise :** Localisez la direction de la Mecque avec une boussole animée fluide et précise.
+- **🕒 Horaires de Prière & Notifications :** Recevez des rappels pour chaque prière (y compris un rappel 5 minutes avant) qui se répètent quotidiennement.
+- **☀️ Rappels d'Adhkar :** Notifications pour les Adhkar du matin et du soir.
+- **🔍 Recherche Puissante :** Trouvez instantanément n'importe quel verset ou sourate.
+- **🎧 Écoute Audio :** Récitation de haute qualité avec gestion intelligente du cache.
+- **🌙 Thèmes Dynamiques :** Support complet du mode Clair (Parchemin) et du mode Sombre (Émeraude).
 
 ## 🛠️ Stack Technique
 
 - **Framework :** React Native / Expo
 - **Langage :** TypeScript
-- **Style :** Flexbox / Moteur de thèmes dynamiques
+- **Style :** Vanilla CSS (Flexbox) pour une performance maximale
 - **Icônes :** Lucide React Native
-- **Stockage :** Expo SQLite / AsyncStorage
-- **Notifications :** Expo Notifications
+- **Stockage :** AsyncStorage avec mise en cache optimisée des données volumineuses
+- **Notifications :** Expo Notifications (Triggers quotidiens répétitifs)
 - **Déploiement :** EAS (Expo Application Services)
 
 ## 🚀 Mise en route
@@ -56,11 +59,11 @@ Une application Coranique premium et riche en fonctionnalités, construite avec 
 
 ## 📦 Déploiement et Mises à jour
 
-Cette application utilise **EAS Update** pour des déploiements fluides.
+Cette application utilise **EAS Update** pour des mises à jour Over-The-Air (OTA).
 
-- **Pour publier une nouvelle mise à jour :**
+- **Pour publier une mise à jour instantanée :**
   ```bash
-  eas update --branch production --message "Décrivez vos changements"
+  eas update --branch production --message "Mise à jour des fonctionnalités hors ligne"
   ```
 
 ---
