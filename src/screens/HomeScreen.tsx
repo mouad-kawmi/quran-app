@@ -1,16 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import { View, FlatList, StyleSheet, ActivityIndicator, SafeAreaView, Text, TextInput, TouchableOpacity, StatusBar, Platform } from 'react-native';
+import { View, FlatList, StyleSheet, ActivityIndicator, SafeAreaView } from 'react-native';
 import { Colors } from '../constants/Colors';
-import { fetchSurahs, fetchSurahDetail, Surah } from '../api/quranApi';
+import { fetchSurahs, Surah } from '../api/quranApi';
 import SurahCard from '../components/SurahCard';
 import { Translations } from '../constants/Translations';
 import { Storage } from '../utils/storage';
-import { DAILY_VERSES } from '../constants/DailyVerses';
-import { Clock, Heart, Search, ChevronRight } from 'lucide-react-native';
 import { getHijriDate } from '../utils/dateUtils';
+import { RemoteContentService, RemoteVerse } from '../api/remoteContent';
+import { useQuranSync } from '../hooks/useQuranSync';
+
+// Sub-components
+import HomeHeader from '../components/home/HomeHeader';
+import DailyVerseCard from '../components/home/DailyVerseCard';
+import LastReadCard from '../components/home/LastReadCard';
+import SyncStatusBanner from '../components/home/SyncStatusBanner';
 
 interface Props {
-    onSelectSurah: (number: number, name: string, arabicName: string, startAyah?: number) => void;
+    onSelectSurah: (num: number, name: string, arName: string, start?: number) => void;
     lang: string;
     theme: 'dark' | 'light';
     refreshTrigger?: number;
@@ -18,269 +24,76 @@ interface Props {
 
 const HomeScreen = ({ onSelectSurah, lang, theme, refreshTrigger }: Props) => {
     const t = Translations[lang];
+    const activeColors = theme === 'dark' ? Colors.dark : Colors.light;
+    const { isSyncing, syncProgress, checkAndSyncQuran } = useQuranSync();
+
     const [surahs, setSurahs] = useState<Surah[]>([]);
     const [filteredSurahs, setFilteredSurahs] = useState<Surah[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [lastRead, setLastRead] = useState<any>(null);
-    const [syncProgress, setSyncProgress] = useState(0);
-    const [isSyncing, setIsSyncing] = useState(false);
-
-    const isDark = theme === 'dark';
-    const activeColors = isDark ? Colors.dark : Colors.light;
-
-    const hijriDate = getHijriDate(lang);
-    const hour = new Date().getHours();
-    let greeting = "";
-    if (lang === 'ar') {
-        if (hour >= 5 && hour < 12) greeting = 'صباح الخير';
-        else if (hour >= 12 && hour < 18) greeting = 'طاب يومك';
-        else greeting = 'مساء الخير';
-    } else {
-        if (hour >= 5 && hour < 12) greeting = 'Good Morning';
-        else if (hour >= 12 && hour < 17) greeting = 'Good Afternoon';
-        else greeting = 'Good Evening';
-    }
+    const [dailyVerse, setDailyVerse] = useState<RemoteVerse | null>(null);
 
     useEffect(() => {
-        loadSurahs();
-        loadLastRead();
+        const loadAll = async () => {
+            setLoading(true);
+            const [surahData, lastReadData, verseData] = await Promise.all([
+                fetchSurahs(), Storage.getLastRead(), RemoteContentService.getDailyVerse()
+            ]);
+            if (surahData) {
+                setSurahs(surahData);
+                setFilteredSurahs(surahData);
+                checkAndSyncQuran(surahData);
+            }
+            setLastRead(lastReadData);
+            setDailyVerse(verseData);
+            setLoading(false);
+        };
+        loadAll();
     }, [refreshTrigger]);
 
-    const loadSurahs = async () => {
-        try {
-            setLoading(true);
-            const data = await fetchSurahs();
-
-            if (data && data.length > 0) {
-                setSurahs(data);
-                setFilteredSurahs(data);
-                checkAndSyncQuran(data);
-            } else {
-                console.error("fetchSurahs returned empty data");
-            }
-        } catch (e) {
-            console.error("Critical error loading surahs:", e);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const loadLastRead = async () => {
-        const data = await Storage.getLastRead();
-        if (data) setLastRead(data);
-    };
-
-    const checkAndSyncQuran = async (surahList: Surah[]) => {
-        const isSynced = await Storage.isFullSynced();
-        if (isSynced) {
-            setSyncProgress(100);
-            return;
-        }
-
-        setIsSyncing(true);
-        let count = 0;
-        const totalItems = surahList.length + 30; // 114 Surahs + 30 Juzs
-
-        // Helper to add delay
-        const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-
-        // 1. Sync Surahs
-        for (const surah of surahList) {
-            try {
-                const cached = await Storage.getSurahCache(surah.number);
-                if (!cached) {
-                    const fullDetails = await fetchSurahDetail(surah.number);
-                    const minimizedDetails = fullDetails.map((edition: any) => ({
-                        e: { id: edition.edition.identifier },
-                        a: edition.ayahs.map((a: any) => ({
-                            n: a.number,
-                            ns: a.numberInSurah,
-                            t: a.text,
-                            p: a.page,
-                            j: a.juz
-                        }))
-                    }));
-                    await Storage.saveSurahCache(surah.number, minimizedDetails);
-                    await delay(200);
-                }
-                count++;
-                setSyncProgress(Math.floor((count / totalItems) * 100));
-            } catch (e) {
-                console.log(`Sync skipped for Surah ${surah.number}`, e);
-                count++;
-                continue;
-            }
-        }
-
-        // 2. Sync Juzs (Crucial for Offline Khatma)
-        for (let j = 1; j <= 30; j++) {
-            try {
-                const cachedJuz = await Storage.getJuzCache(j);
-                if (!cachedJuz) {
-                    const response = await fetch(`https://api.alquran.cloud/v1/juz/${j}/quran-uthmani`);
-                    const resJson = await response.json();
-                    if (resJson.data && resJson.data.ayahs) {
-                        await Storage.saveJuzCache(j, resJson.data.ayahs);
-                        await delay(200);
-                    }
-                }
-                count++;
-                setSyncProgress(Math.floor((count / totalItems) * 100));
-            } catch (e) {
-                console.log(`Sync skipped for Juz ${j}`, e);
-                count++;
-                continue;
-            }
-        }
-
-        if (count >= totalItems) {
-            await Storage.setFullSync(true);
-        }
-        setIsSyncing(false);
-    };
-
-    const normalizeArabic = (text: string) => {
-        return text.replace(/[ًٌٍَُِّْٰ]/g, '');
-    };
-
     const handleSearch = (text: string) => {
-        setSearchQuery(text);
-        if (text.trim() === '') {
-            setFilteredSurahs(surahs);
-        } else {
-            const normalizedQuery = normalizeArabic(text);
-            const filtered = surahs.filter(
-                (s) =>
-                    s.englishName.toLowerCase().includes(text.toLowerCase()) ||
-                    normalizeArabic(s.name).includes(normalizedQuery) ||
-                    s.number.toString() === text
-            );
-            setFilteredSurahs(filtered);
-        }
+        const q = text.trim().toLowerCase();
+        setSearchQuery(q);
+        if (!q) return setFilteredSurahs(surahs);
+
+        const clean = (val: string) => val.replace(/[ًٌٍَُِّْٰ]/g, '');
+        setFilteredSurahs(surahs.filter(s =>
+            s.englishName.toLowerCase().includes(q) || clean(s.name).includes(clean(q)) || s.number.toString() === q
+        ));
     };
 
-    if (loading) {
+    if (loading || !dailyVerse) {
         return (
-            <View style={[styles.loadingContainer, { backgroundColor: activeColors.background }]}>
+            <View style={[styles.loading, { backgroundColor: activeColors.background }]}>
                 <ActivityIndicator size="large" color={Colors.secondary} />
             </View>
         );
     }
 
-    const dayOfYear = Math.floor((new Date().getTime() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
-    const dailyVerse = DAILY_VERSES[dayOfYear % DAILY_VERSES.length];
+    const hour = new Date().getHours();
+    const greeting = lang === 'ar'
+        ? (hour < 12 ? 'صباح الخير' : (hour < 18 ? 'طاب يومك' : 'مساء الخير'))
+        : (hour < 12 ? 'Good Morning' : (hour < 17 ? 'Good Afternoon' : 'Good Evening'));
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: activeColors.background }]}>
-            <View style={styles.header}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                    <Text style={[styles.greeting, { color: activeColors.textMuted }]}>{greeting}</Text>
-                    <Text style={[styles.hijriDate, { color: Colors.secondary }]}>{hijriDate}</Text>
-                </View>
-                <Text style={[styles.title, { color: activeColors.text }]}>{t.quran}</Text>
-                <View style={[styles.searchContainer, { backgroundColor: activeColors.surface }]}>
-                    <Search size={20} color={activeColors.textMuted} />
-                    <TextInput
-                        style={[styles.searchInput, { color: activeColors.text }]}
-                        placeholder={t.searchSurah}
-                        placeholderTextColor={activeColors.textMuted}
-                        value={searchQuery}
-                        onChangeText={handleSearch}
-                    />
-                </View>
-            </View>
+            <HomeHeader greeting={greeting} hijriDate={getHijriDate(lang)} title={t.quran}
+                searchQuery={searchQuery} setSearchQuery={setSearchQuery} onSearch={handleSearch} placeholder={t.searchSurah} activeColors={activeColors} />
 
-            {isSyncing && (
-                <View style={[styles.syncContainer, { backgroundColor: activeColors.surface, borderLeftWidth: 4, borderLeftColor: Colors.secondary }]}>
-                    <View style={styles.syncHeader}>
-                        <Text style={[styles.syncText, { color: activeColors.text }]}>
-                            {lang === 'ar' ? 'جاري تحميل القرآن...' : 'Downloading Quran...'}
-                        </Text>
-                        <Text style={[styles.syncPercent, { color: Colors.secondary }]}>{syncProgress}%</Text>
-                    </View>
-                    <View style={[styles.progressBarBg, { backgroundColor: activeColors.surfaceLight }]}>
-                        <View style={[styles.progressBarFill, { width: `${syncProgress}%`, backgroundColor: Colors.secondary }]} />
-                    </View>
-                </View>
-            )}
+            <SyncStatusBanner isSyncing={isSyncing} syncProgress={syncProgress} lang={lang} activeColors={activeColors} />
 
-            <FlatList
-                data={filteredSurahs}
-                keyExtractor={(item) => item.number.toString()}
-                ListHeaderComponent={() => (
+            <FlatList data={filteredSurahs} keyExtractor={(s) => s.number.toString()} contentContainerStyle={styles.listContent}
+                ListHeaderComponent={() => !searchQuery ? (
                     <>
-                        {!searchQuery && (
-                            <>
-                                <View style={[styles.dailyVerseCard, { backgroundColor: Colors.secondary + '15' }]}>
-                                    <View style={styles.dailyVerseHeader}>
-                                        <Heart size={16} color={Colors.secondary} fill={Colors.secondary} />
-                                        <Text style={[styles.dailyVerseTitle, { color: Colors.secondary }]}>
-                                            {lang === 'ar' ? 'آية اليوم' : 'Verse of the Day'}
-                                        </Text>
-                                    </View>
-                                    <Text style={[styles.dailyVerseText, { color: activeColors.text }]}>{dailyVerse.verse}</Text>
-                                    <Text style={[styles.dailyVerseTranslation, { color: activeColors.textMuted }]}>
-                                        {dailyVerse.translation}
-                                    </Text>
-                                    <Text style={[styles.dailyVerseRef, { color: Colors.secondary }]}>
-                                        {dailyVerse.surah} : {dailyVerse.ayah}
-                                    </Text>
-                                </View>
-
-                                {lastRead && (
-                                    <TouchableOpacity
-                                        style={[styles.lastReadCard, {
-                                            backgroundColor: isDark ? activeColors.surface : '#FFFBF5',
-                                            borderWidth: 1.5,
-                                            borderColor: Colors.secondary,
-                                            shadowColor: Colors.secondary,
-                                            shadowOpacity: 0.1
-                                        }]}
-                                        onPress={() => onSelectSurah(lastRead.number, lastRead.name, lastRead.arabicName || lastRead.name, lastRead.ayahNumber)}
-                                    >
-                                        <View style={{ flex: 1 }}>
-                                            <View style={styles.lastReadHeader}>
-                                                <Clock size={18} color={Colors.secondary} />
-                                                <Text style={[styles.lastReadLabel, { color: Colors.secondary, marginLeft: 8 }]}>{t.lastRead}</Text>
-                                            </View>
-                                            <Text style={[styles.lastReadTitle, { color: activeColors.text }]}>
-                                                {lang === 'ar' ? (lastRead.arabicName || lastRead.name) : lastRead.name}
-                                            </Text>
-                                            <Text style={[styles.lastReadLabel, { color: activeColors.textMuted, opacity: 0.8 }]}>
-                                                {lang === 'ar' ? `الآية ${lastRead.ayahNumber}` : `Ayah ${lastRead.ayahNumber}`}
-                                            </Text>
-                                        </View>
-                                        <View style={[styles.lastReadArrow, { backgroundColor: 'rgba(212,175,55,0.1)' }]}>
-                                            <ChevronRight size={24} color={Colors.secondary} />
-                                        </View>
-                                    </TouchableOpacity>
-                                )}
-                            </>
-                        )}
+                        <DailyVerseCard dailyVerse={dailyVerse} lang={lang} activeColors={activeColors} />
+                        <LastReadCard lastRead={lastRead} lang={lang} isDark={theme === 'dark'} activeColors={activeColors} translations={t}
+                            onPress={() => onSelectSurah(lastRead.number, lastRead.name, lastRead.arabicName || lastRead.name, lastRead.ayahNumber)} />
                     </>
-                )}
+                ) : null}
                 renderItem={({ item }) => (
-                    <SurahCard
-                        surah={item}
-                        onPress={() => onSelectSurah(item.number, item.englishName, item.name)}
-                        lang={lang}
-                        theme={theme}
-                    />
+                    <SurahCard surah={item} onPress={() => onSelectSurah(item.number, item.englishName, item.name)} lang={lang} theme={theme} />
                 )}
-                ListEmptyComponent={() => (
-                    <View style={styles.emptyContainer}>
-                        <Text style={[styles.emptyText, { color: activeColors.text }]}>
-                            {lang === 'ar' ? 'لم يتم العثور على سور' : 'No surahs found'}
-                        </Text>
-                        <TouchableOpacity style={[styles.retryBtn, { backgroundColor: Colors.secondary }]} onPress={loadSurahs}>
-                            <Text style={{ fontWeight: 'bold', color: Colors.dark.background }}>
-                                {lang === 'ar' ? 'إعادة المحاولة' : 'Retry'}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-                contentContainerStyle={styles.listContent}
             />
         </SafeAreaView>
     );
@@ -288,63 +101,8 @@ const HomeScreen = ({ onSelectSurah, lang, theme, refreshTrigger }: Props) => {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: {
-        paddingHorizontal: 20,
-        paddingBottom: 20,
-        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 10 : 10
-    },
-    title: { fontSize: 28, fontWeight: 'bold', marginBottom: 15 },
-    searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderRadius: 15,
-        paddingHorizontal: 15,
-        height: 50,
-        shadowColor: '#000',
-        shadowOpacity: 0.05,
-        elevation: 2,
-    },
-    searchInput: { flex: 1, fontSize: 16, marginLeft: 10 },
+    loading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     listContent: { paddingBottom: 20, paddingHorizontal: 20 },
-    dailyVerseCard: {
-        padding: 20,
-        borderRadius: 20,
-        marginBottom: 20,
-        marginTop: 5,
-    },
-    dailyVerseHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-    dailyVerseTitle: { fontSize: 14, fontWeight: 'bold', marginLeft: 8 },
-    dailyVerseText: { fontSize: 20, fontWeight: 'bold', textAlign: 'right', lineHeight: 32, marginBottom: 10 },
-    dailyVerseTranslation: { fontSize: 14, lineHeight: 22, marginBottom: 10 },
-    dailyVerseRef: { fontSize: 12, fontWeight: 'bold', textAlign: 'right' },
-    lastReadCard: {
-        flexDirection: 'row',
-        padding: 25,
-        borderRadius: 25,
-        marginBottom: 25,
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        shadowColor: '#000',
-        shadowOpacity: 0.1,
-        elevation: 5,
-    },
-    lastReadHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
-    lastReadIcon: { fontSize: 18, marginRight: 8 },
-    lastReadLabel: { fontSize: 12, fontWeight: '600', opacity: 0.8 },
-    lastReadTitle: { fontSize: 22, fontWeight: 'bold' },
-    lastReadArrow: { width: 45, height: 45, borderRadius: 23, justifyContent: 'center', alignItems: 'center' },
-    syncContainer: { padding: 15, marginHorizontal: 20, borderRadius: 15, marginBottom: 20 },
-    syncHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-    syncText: { fontSize: 13, fontWeight: '500', flex: 1 },
-    syncPercent: { fontSize: 13, fontWeight: 'bold', marginLeft: 10 },
-    progressBarBg: { height: 6, borderRadius: 3, overflow: 'hidden' },
-    progressBarFill: { height: '100%', borderRadius: 3 },
-    greeting: { fontSize: 13, fontWeight: '500' },
-    hijriDate: { fontSize: 13, fontWeight: 'bold' },
-    emptyContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
-    emptyText: { fontSize: 16, marginBottom: 20, textAlign: 'center' },
-    retryBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
 });
 
 export default HomeScreen;

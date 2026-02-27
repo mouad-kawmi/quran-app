@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, SafeAreaView, TouchableOpacity, ScrollView, BackHandler } from 'react-native';
+import { View, Text, StyleSheet, FlatList, SafeAreaView, TouchableOpacity, ScrollView, BackHandler, ActivityIndicator } from 'react-native';
 import { Translations } from '../constants/Translations';
 import { Colors } from '../constants/Colors';
+import { RemoteContentService } from '../api/remoteContent';
 
 const ADHKAR_CATEGORIES = [
     {
@@ -59,10 +60,29 @@ interface Props {
 
 const AdhkarScreen = ({ lang, theme }: Props) => {
     const t = Translations[lang];
+    const [categories, setCategories] = useState<any[]>(ADHKAR_CATEGORIES);
     const [selectedCategory, setSelectedCategory] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
     const [counts, setCounts] = useState<any>({});
     const isDark = theme === 'dark';
     const activeColors = isDark ? Colors.dark : Colors.light;
+
+    useEffect(() => {
+        loadRemoteAdhkar();
+    }, []);
+
+    const loadRemoteAdhkar = async () => {
+        try {
+            const remote = await RemoteContentService.getAdhkar();
+            if (remote && remote.length > 0) {
+                setCategories(remote);
+            }
+        } catch (e) {
+            console.log("Error loading remote adhkar", e);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         const backAction = () => {
@@ -87,6 +107,14 @@ const AdhkarScreen = ({ lang, theme }: Props) => {
             setCounts({ ...counts, [adhkarId]: currentCount + 1 });
         }
     };
+
+    if (loading && categories.length === 0) {
+        return (
+            <View style={[styles.center, { backgroundColor: activeColors.background }]}>
+                <ActivityIndicator size="large" color={Colors.secondary} />
+            </View>
+        );
+    }
 
     if (selectedCategory) {
         return (
@@ -146,7 +174,7 @@ const AdhkarScreen = ({ lang, theme }: Props) => {
                 <Text style={[styles.headerTitle, { color: Colors.secondary }]}>{t.adhkar}</Text>
             </View>
             <FlatList
-                data={ADHKAR_CATEGORIES}
+                data={categories}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
                     <TouchableOpacity
@@ -171,6 +199,7 @@ const AdhkarScreen = ({ lang, theme }: Props) => {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     header: { padding: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     headerTitle: { fontSize: 20, fontWeight: 'bold' },
     backButton: { padding: 5 },

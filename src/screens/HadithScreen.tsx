@@ -5,6 +5,7 @@ import { Colors } from '../constants/Colors';
 import { fetchHadiths } from '../api/quranApi';
 import { Translations } from '../constants/Translations';
 import { Star } from 'lucide-react-native';
+import { RemoteContentService } from '../api/remoteContent';
 
 const CATEGORIES = [
     { id: 'all', ar: 'الكل', en: 'All' },
@@ -29,10 +30,18 @@ const HadithScreen = ({ lang, theme }: any) => {
 
     const loadHadiths = async () => {
         try {
-            const data = await fetchHadiths();
-            const list = Array.isArray(data) ? data : ((data as any).ahadith || []);
+            // First, try fetching from Firebase
+            const remoteData = await RemoteContentService.getHadiths();
+            let list = [];
 
-            // Respect the categories from the data source
+            if (remoteData.length > 0) {
+                list = remoteData;
+            } else {
+                // Fallback to API if Firebase is empty
+                const data = await fetchHadiths();
+                list = Array.isArray(data) ? data : ((data as any).ahadith || []);
+            }
+
             const categorizedList = list.map((h: any, index: number) => ({
                 ...h,
                 id: h.id || index.toString(),

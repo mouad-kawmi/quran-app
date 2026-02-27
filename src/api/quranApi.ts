@@ -27,7 +27,7 @@ export const fetchSurahs = async (): Promise<Surah[]> => {
 export const fetchSurahDetail = async (surahNumber: number) => {
     try {
         // Reduced editions to save space (Uthmani text + Muyassar tafsir + Pickthall translation)
-        const response = await axios.get(`${BASE_URL}/surah/${surahNumber}/editions/quran-uthmani,ar.muyassar,en.pickthall`);
+        const response = await axios.get(`${BASE_URL}/surah/${surahNumber}/editions/quran-uthmani,ar.muyassar,en.pickthall`, { timeout: 10000 });
         return response.data.data;
     } catch (error) {
         console.error(`Error fetching surah ${surahNumber}:`, error);
