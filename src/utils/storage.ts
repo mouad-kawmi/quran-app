@@ -13,7 +13,8 @@ const KEYS = {
     FULL_SYNC: '@fullSync',
     JUZ_CACHE_PREFIX: '@quran_premium_juz_cache_',
     PUSH_TOKEN: '@quran_premium_push_token',
-    RECITER: '@reciter'
+    RECITER: '@reciter',
+    LAST_LOCATION: '@lastLocation'
 };
 
 export const Storage = {
@@ -124,10 +125,18 @@ export const Storage = {
         return data ? data : 'Alafasy_128kbps'; // Default
     },
 
+    async saveLocation(latitude: number, longitude: number) {
+        await AsyncStorage.setItem(KEYS.LAST_LOCATION, JSON.stringify({ latitude, longitude }));
+    },
+    async getLocation(): Promise<{ latitude: number, longitude: number } | null> {
+        const data = await AsyncStorage.getItem(KEYS.LAST_LOCATION);
+        return data ? JSON.parse(data) : null;
+    },
+
     async clearAllCache() {
         const allKeys = await AsyncStorage.getAllKeys();
-        const cacheKeys = allKeys.filter(key => 
-            key.startsWith(KEYS.SURAH_CACHE_PREFIX) || 
+        const cacheKeys = allKeys.filter(key =>
+            key.startsWith(KEYS.SURAH_CACHE_PREFIX) ||
             key.startsWith(KEYS.JUZ_CACHE_PREFIX)
         );
         await AsyncStorage.multiRemove(cacheKeys);

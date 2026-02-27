@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, Animated, Easi
 import * as Location from 'expo-location';
 import { Translations } from '../constants/Translations';
 import { Colors } from '../constants/Colors';
+import { Storage } from '../utils/storage';
 import { Compass, Navigation } from 'lucide-react-native';
 
 interface Props {
@@ -26,17 +27,38 @@ const QiblaScreen = ({ lang, theme }: Props) => {
 
         (async () => {
             try {
+                // 1. Load Last Location from Cache first for immediate display
+                const cachedLoc = await Storage.getLocation();
+                if (cachedLoc) {
+                    calculateQibla(cachedLoc.latitude, cachedLoc.longitude);
+                    setLoading(false); // Stop loading if we have cache
+                }
+
+                // 2. Request fresh location
                 let { status } = await Location.requestForegroundPermissionsAsync();
                 if (status !== 'granted') {
-                    setLoading(false);
+                    // If no permission but we have cache, we just keep using cache
+                    if (!cachedLoc) {
+                        calculateQibla(33.5731, -7.5898); // Fallback to Casablanca
+                        setLoading(false);
+                    }
                     return;
                 }
 
-                let loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-                const { latitude, longitude } = loc.coords;
+                // Try to get fresh location, but with a timeout
+                try {
+                    let loc = await Location.getCurrentPositionAsync({
+                        accuracy: Location.Accuracy.Balanced, // Balanced is faster and more offline-friendly
+                    });
+                    const { latitude, longitude } = loc.coords;
+                    calculateQibla(latitude, longitude);
+                    await Storage.saveLocation(latitude, longitude);
+                } catch (locErr) {
+                    console.log("[Qibla] Could not get fresh location, using cache/default");
+                    if (!cachedLoc) calculateQibla(33.5731, -7.5898);
+                }
 
-                calculateQibla(latitude, longitude);
-
+                // 3. Start Compass
                 headingSubscription = await Location.watchHeadingAsync((data) => {
                     const currentHeading = data.trueHeading >= 0 ? data.trueHeading : data.magHeading;
 
@@ -51,7 +73,7 @@ const QiblaScreen = ({ lang, theme }: Props) => {
                 });
 
             } catch (e) {
-                console.error(e);
+                console.error("[Qibla] Init Error:", e);
             } finally {
                 setLoading(false);
             }

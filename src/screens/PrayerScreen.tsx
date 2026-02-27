@@ -32,7 +32,7 @@ const PrayerScreen = ({ lang, theme }: Props) => {
     useEffect(() => {
         const loadInitialData = async () => {
             try {
-                // 1. First, check if we have something in cache
+                // 1. Load from cache immediately
                 const cached = await Storage.getPrayerTimes();
                 let lat = DEFAULT_LOCATION.latitude;
                 let lon = DEFAULT_LOCATION.longitude;
@@ -44,15 +44,14 @@ const PrayerScreen = ({ lang, theme }: Props) => {
                         setCity(cached.city);
                         currentCity = cached.city;
                     }
-
-                    // If cache is from today, show it immediately and we're done with "loading"
+                    // Even if we have cache, we only stop loading if it's from today
                     if (cached.date === new Date().toDateString()) {
                         setLoading(false);
                     }
                 }
 
-                // 2. Fetch fresh data based on the city (Last used or Casablanca)
-                // We DON'T use Location detection here to avoid popups
+                // 2. Fetch fresh data if needed or missing
+                // This won't block the UI because we already set timings above
                 await fetchPrayerTimes(lat, lon, currentCity);
 
             } catch (e) {
