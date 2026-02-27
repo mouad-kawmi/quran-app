@@ -77,7 +77,7 @@ const PrayerScreen = ({ lang, theme }: Props) => {
     const fetchPrayerTimes = async (lat: number, lon: number, cityName: string) => {
         try {
             // Using a fixed method (21 = French method often used in Morocco, or 3 for general)
-            const response = await axios.get(`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lon}&method=21`);
+            const response = await axios.get(`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lon}&method=21`, { timeout: 5000 });
             const data = response.data.data.timings;
 
             setTimings(data);

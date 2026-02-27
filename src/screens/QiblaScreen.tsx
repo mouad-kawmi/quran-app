@@ -27,49 +27,46 @@ const QiblaScreen = ({ lang, theme }: Props) => {
 
         (async () => {
             try {
-                // 1. Load Last Location from Cache first for immediate display
+                // 1. Get Location (Cached or Fresh)
+                let lat = 33.5731; // Default Casablanca
+                let lon = -7.5898;
+
                 const cachedLoc = await Storage.getLocation();
                 if (cachedLoc) {
-                    calculateQibla(cachedLoc.latitude, cachedLoc.longitude);
-                    setLoading(false); // Stop loading if we have cache
+                    lat = cachedLoc.latitude;
+                    lon = cachedLoc.longitude;
                 }
 
-                // 2. Request fresh location
-                let { status } = await Location.requestForegroundPermissionsAsync();
-                if (status !== 'granted') {
-                    // If no permission but we have cache, we just keep using cache
-                    if (!cachedLoc) {
-                        calculateQibla(33.5731, -7.5898); // Fallback to Casablanca
-                        setLoading(false);
+                calculateQibla(lat, lon);
+                setLoading(false);
+
+                // Try to get fresh location in parallel (won't block)
+                Location.requestForegroundPermissionsAsync().then(({ status }) => {
+                    if (status === 'granted') {
+                        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+                            .then(loc => {
+                                calculateQibla(loc.coords.latitude, loc.coords.longitude);
+                                Storage.saveLocation(loc.coords.latitude, loc.coords.longitude);
+                            }).catch(() => { });
                     }
-                    return;
-                }
+                });
 
-                // Try to get fresh location, but with a timeout
-                try {
-                    let loc = await Location.getCurrentPositionAsync({
-                        accuracy: Location.Accuracy.Balanced, // Balanced is faster and more offline-friendly
-                    });
-                    const { latitude, longitude } = loc.coords;
-                    calculateQibla(latitude, longitude);
-                    await Storage.saveLocation(latitude, longitude);
-                } catch (locErr) {
-                    console.log("[Qibla] Could not get fresh location, using cache/default");
-                    if (!cachedLoc) calculateQibla(33.5731, -7.5898);
-                }
+                // 2. Start Heading Subscription
+                const { status: magStatus } = await Location.requestForegroundPermissionsAsync();
+                if (magStatus !== 'granted') return;
 
-                // 3. Start Compass
                 headingSubscription = await Location.watchHeadingAsync((data) => {
-                    const currentHeading = data.trueHeading >= 0 ? data.trueHeading : data.magHeading;
+                    let currentHeading = data.trueHeading >= 0 ? data.trueHeading : data.magHeading;
 
-                    Animated.timing(animatedHeading, {
-                        toValue: currentHeading,
-                        duration: 150,
-                        easing: Easing.linear,
-                        useNativeDriver: true,
-                    }).start();
+                    // Handle 0/360 jump for smooth animation
+                    setHeading(prevHeading => {
+                        let newHeading = currentHeading;
+                        // Simple jump smoothing logic could be added here if needed
+                        // but Animated.timing with low duration usually handles minor jitters
 
-                    setHeading(currentHeading);
+                        animatedHeading.setValue(newHeading);
+                        return newHeading;
+                    });
                 });
 
             } catch (e) {
@@ -101,7 +98,7 @@ const QiblaScreen = ({ lang, theme }: Props) => {
 
     const rotateCompass = animatedHeading.interpolate({
         inputRange: [0, 360],
-        outputRange: ['360deg', '0deg']
+        outputRange: ['0deg', '-360deg']
     });
 
     const rotateNeedle = animatedHeading.interpolate({

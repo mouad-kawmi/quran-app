@@ -30,6 +30,7 @@ import SavedScreen from './screens/SavedScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import SearchScreen from './screens/SearchScreen';
 import HadithScreen from './screens/HadithScreen';
+import QiblaScreen from './screens/QiblaScreen';
 import { Translations } from './constants/Translations';
 import { Colors } from './constants/Colors';
 import { Storage } from './utils/storage';
@@ -286,6 +287,8 @@ export default function App() {
         );
       case 'hadith':
         return <HadithScreen lang={lang} theme={theme} />;
+      case 'qibla':
+        return <QiblaScreen lang={lang} theme={theme} />;
       default:
         return <HomeScreen onSelectSurah={navigateToDetail} lang={lang} theme={theme} />;
     }
