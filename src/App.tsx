@@ -62,6 +62,7 @@ export default function App() {
   const [theme, setTheme] = useState<Theme>('dark');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [homeRefreshTrigger, setHomeRefreshTrigger] = useState(0);
+  const [reciter, setReciter] = useState('Alafasy_128kbps');
 
   const t = Translations[lang];
 
@@ -119,6 +120,9 @@ export default function App() {
 
     const savedTheme = await Storage.getTheme();
     if (savedTheme) setTheme(savedTheme as Theme);
+
+    const savedReciter = await Storage.getReciter();
+    if (savedReciter) setReciter(savedReciter);
 
     const khatma = await Storage.getKhatma();
     if (khatma) {
@@ -207,7 +211,15 @@ export default function App() {
 
   const renderContent = () => {
     if (currentScreen === 'detail' && selectedSurah) {
-      return <SurahDetailScreen route={{ params: selectedSurah }} onBack={handleBackToList} lang={lang} theme={theme} />;
+      return (
+        <SurahDetailScreen
+          route={{ params: selectedSurah }}
+          onBack={handleBackToList}
+          lang={lang}
+          theme={theme}
+          reciter={reciter}
+        />
+      );
     }
 
     if (currentScreen === 'khatma_reader') {
@@ -218,6 +230,7 @@ export default function App() {
           onBack={handleBackToList}
           lang={lang}
           theme={theme}
+          reciter={reciter}
         />
       );
     }
@@ -261,7 +274,16 @@ export default function App() {
       case 'saved':
         return <SavedScreen onSelectBookmark={(num, name, ayah) => navigateToDetail(num, name, name, ayah)} lang={lang} theme={theme} />;
       case 'settings':
-        return <SettingsScreen lang={lang} theme={theme} onToggleLang={toggleLanguage} onToggleTheme={toggleTheme} />;
+        return (
+          <SettingsScreen
+            lang={lang}
+            theme={theme}
+            onToggleLang={toggleLanguage}
+            onToggleTheme={toggleTheme}
+            reciter={reciter}
+            setReciter={setReciter}
+          />
+        );
       case 'hadith':
         return <HadithScreen lang={lang} theme={theme} />;
       default:
@@ -304,13 +326,6 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
-
-// --- CONFIGURATION FOR TOP BAR POSITION ---
-const TOP_SPACING = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 10 : 10;
-
-// --- CONFIGURATION FOR MENU ICON SPECIFICALLY ---
-const MENU_ICON_Y = 20; // Change this to move the menu icon Up (-) or Down (+)
-const MENU_ICON_X = 0; // Change this to move the menu icon Left (-) or Right (+)
 
 const styles = StyleSheet.create({
   simpleHeader: {

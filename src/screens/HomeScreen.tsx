@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, FlatList, StyleSheet, ActivityIndicator, SafeAreaView, Text, TextInput, TouchableOpacity, ScrollView, StatusBar, Platform } from 'react-native';
+import { View, FlatList, StyleSheet, ActivityIndicator, SafeAreaView, Text, TextInput, TouchableOpacity, StatusBar, Platform } from 'react-native';
 import { Colors } from '../constants/Colors';
 import { fetchSurahs, fetchSurahDetail, Surah } from '../api/quranApi';
 import SurahCard from '../components/SurahCard';
 import { Translations } from '../constants/Translations';
 import { Storage } from '../utils/storage';
 import { DAILY_VERSES } from '../constants/DailyVerses';
-import { LucideIcon, BookOpen, Clock, Heart, Search, ChevronRight } from 'lucide-react-native';
+import { Clock, Heart, Search, ChevronRight } from 'lucide-react-native';
 import { getHijriDate } from '../utils/dateUtils';
 
 interface Props {
@@ -50,17 +50,15 @@ const HomeScreen = ({ onSelectSurah, lang, theme, refreshTrigger }: Props) => {
     const loadSurahs = async () => {
         try {
             setLoading(true);
-            let data = await fetchSurahs();
+            const data = await fetchSurahs();
 
-            // Fail-safe: if data is empty or null, use data from constants directly
-            if (!data || data.length === 0) {
-                const { SURAH_LIST_DATA } = require('../constants/SurahData');
-                data = SURAH_LIST_DATA;
+            if (data && data.length > 0) {
+                setSurahs(data);
+                setFilteredSurahs(data);
+                checkAndSyncQuran(data);
+            } else {
+                console.error("fetchSurahs returned empty data");
             }
-
-            setSurahs(data);
-            setFilteredSurahs(data);
-            checkAndSyncQuran(data);
         } catch (e) {
             console.error("Critical error loading surahs:", e);
         } finally {
@@ -98,7 +96,9 @@ const HomeScreen = ({ onSelectSurah, lang, theme, refreshTrigger }: Props) => {
                         a: edition.ayahs.map((a: any) => ({
                             n: a.number,
                             ns: a.numberInSurah,
-                            t: a.text
+                            t: a.text,
+                            p: a.page,
+                            j: a.juz
                         }))
                     }));
                     await Storage.saveSurahCache(surah.number, minimizedDetails);

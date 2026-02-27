@@ -211,6 +211,13 @@ const KhatmaScreen = ({
                                 </Text>
                             </TouchableOpacity>
                         </View>
+
+                        <View style={{ marginTop: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#4CAF50', marginRight: 8 }} />
+                            <Text style={{ fontSize: 11, color: activeColors.textMuted }}>
+                                {lang === 'ar' ? 'متاح بدون إنترنت' : 'Available Offline'}
+                            </Text>
+                        </View>
                     </View>
                 )}
 

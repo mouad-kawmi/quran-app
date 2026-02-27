@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Switch, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Switch, Alert, ScrollView, Modal } from 'react-native';
 import { Translations } from '../constants/Translations';
 import { Colors } from '../constants/Colors';
 import { Storage } from '../utils/storage';
@@ -14,13 +14,25 @@ interface Props {
     theme: 'dark' | 'light';
     onToggleLang: () => void;
     onToggleTheme: () => void;
+    reciter: string;
+    setReciter: (val: string) => void;
 }
 
-const SettingsScreen = ({ lang, theme, onToggleLang, onToggleTheme }: Props) => {
+const RECITERS = [
+    { id: 'Alafasy_128kbps', nameAr: 'مشاري العفاسي', nameEn: 'Mishary Al-Afasy' },
+    { id: 'MaherAlMuaiqly128kbps', nameAr: 'ماهر المعيقلي', nameEn: 'Maher Al-Muaiqly' },
+    { id: 'Abdurrahmaan_As-Sudais_192kbps', nameAr: 'عبد الرحمن السديس', nameEn: 'Abdur-Rahman As-Sudais' },
+    { id: 'Yasser_Ad-Dussary_128kbps', nameAr: 'ياسر الدوسري', nameEn: 'Yasser Al-Dosari' },
+    { id: 'Minshawy_Murattal_128kbps', nameAr: 'محمد صديق المنشاوي', nameEn: 'Muhammad Al-Minshawi' },
+    { id: 'Abdul_Basit_Murattal_192kbps', nameAr: 'عبد الباسط عبد الصمد', nameEn: 'Abdelbasset Abdessamad' }
+];
+
+const SettingsScreen = ({ lang, theme, onToggleLang, onToggleTheme, reciter, setReciter }: Props) => {
     const t = Translations[lang];
     const [isDownloading, setIsDownloading] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState(0);
     const [isDownloaded, setIsDownloaded] = useState(false);
+    const [showReciterModal, setShowReciterModal] = useState(false);
 
     useEffect(() => {
         checkDownloadStatus();
@@ -107,7 +119,7 @@ const SettingsScreen = ({ lang, theme, onToggleLang, onToggleTheme }: Props) => 
                 <Text style={[styles.title, { color: Colors.secondary }]}>{t.settings}</Text>
             </View>
 
-            <View style={styles.content}>
+            <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
                 <View style={[styles.settingItem, { backgroundColor: activeColors.surface }]}>
                     <View>
                         <Text style={[styles.settingLabel, { color: activeColors.text }]}>{t.language}</Text>
@@ -117,6 +129,22 @@ const SettingsScreen = ({ lang, theme, onToggleLang, onToggleTheme }: Props) => 
                     </View>
                     <TouchableOpacity style={styles.toggleBtn} onPress={onToggleLang}>
                         <Text style={styles.toggleBtnText}>{lang === 'en' ? 'AR' : 'EN'}</Text>
+                    </TouchableOpacity>
+                </View>
+
+                <View style={[styles.settingItem, { backgroundColor: activeColors.surface }]}>
+                    <View>
+                        <Text style={[styles.settingLabel, { color: activeColors.text }]}>
+                            {lang === 'ar' ? 'القارئ المفضل' : 'Preferred Reciter'}
+                        </Text>
+                        <Text style={[styles.settingValue, { color: activeColors.textMuted }]}>
+                            {RECITERS.find(r => r.id === reciter)?.[lang === 'ar' ? 'nameAr' : 'nameEn'] || 'Unknown'}
+                        </Text>
+                    </View>
+                    <TouchableOpacity style={[styles.toggleBtn, { backgroundColor: 'rgba(212, 175, 55, 0.2)' }]} onPress={() => setShowReciterModal(true)}>
+                        <Text style={[styles.toggleBtnText, { color: Colors.secondary }]}>
+                            {lang === 'ar' ? 'تغيير' : 'Change'}
+                        </Text>
                     </TouchableOpacity>
                 </View>
 
@@ -193,7 +221,7 @@ const SettingsScreen = ({ lang, theme, onToggleLang, onToggleTheme }: Props) => 
 
                 <View style={[styles.previewSection, { backgroundColor: activeColors.surface }]}>
                     <Text style={[styles.previewDesc, { color: activeColors.textMuted }]}>
-                        {lang === 'ar' ? 'جرب كيف تظهر التنبيهات على هاتفك:' : 'Experience how notifications look on your device:'}
+                        {lang === 'ar' ? 'جرب كيف تظهر التنبيهات على هاتفك (تأكد من السماح بالاشعارات):' : 'Experience how notifications look on your device (ensure permissions are on):'}
                     </Text>
 
                     <View style={styles.testButtonsRow}>
@@ -206,7 +234,8 @@ const SettingsScreen = ({ lang, theme, onToggleLang, onToggleTheme }: Props) => 
                                         body: lang === 'ar' ? 'ابدأ يومك ببركة الأذكار وطمأنينة القلب' : 'Start your day with blessings and peace',
                                         color: '#74C69D',
                                         categoryIdentifier: 'adhkar',
-                                    },
+                                        android: { channelId: 'adhkar' }
+                                    } as any,
                                     trigger: null,
                                 });
                             }}
@@ -224,7 +253,8 @@ const SettingsScreen = ({ lang, theme, onToggleLang, onToggleTheme }: Props) => 
                                         body: lang === 'ar' ? 'نور يومك بقراءة الورد اليومي من القرآن' : 'Illuminate your day with Quran',
                                         color: '#D4AF37',
                                         categoryIdentifier: 'daily',
-                                    },
+                                        android: { channelId: 'daily' }
+                                    } as any,
                                     trigger: null,
                                 });
                             }}
@@ -242,7 +272,8 @@ const SettingsScreen = ({ lang, theme, onToggleLang, onToggleTheme }: Props) => 
                                         body: lang === 'ar' ? 'حان الآن موعد صلاة الظهر. حي على الصلاة.' : 'It is now time for Dhuhr prayer.',
                                         color: '#081C15',
                                         categoryIdentifier: 'prayer',
-                                    },
+                                        android: { channelId: 'prayer' }
+                                    } as any,
                                     trigger: null,
                                 });
                             }}
@@ -251,6 +282,24 @@ const SettingsScreen = ({ lang, theme, onToggleLang, onToggleTheme }: Props) => 
                             <Text style={[styles.testBtnLabel, { color: activeColors.text }]}>{lang === 'ar' ? 'صلاة' : 'Prayer'}</Text>
                         </TouchableOpacity>
                     </View>
+
+                    <TouchableOpacity
+                        style={[styles.permissionCheckBtn, { borderColor: activeColors.surfaceLight }]}
+                        onPress={async () => {
+                            const { status } = await Notifications.requestPermissionsAsync();
+                            if (status === 'granted') {
+                                Alert.alert(lang === 'ar' ? "مفعلة" : "Granted", lang === 'ar' ? "الاشعارات تعمل بشكل صحيح." : "Notifications are enabled.");
+                                NotificationService.scheduleAll(lang as any);
+                            } else {
+                                Alert.alert(lang === 'ar' ? "مغلقة" : "Disabled", lang === 'ar' ? "يرجى تفعيل الاشعارات من إعدادات الهاتف." : "Please enable notifications in your phone settings.");
+                            }
+                        }}
+                    >
+                        <ShieldCheck size={16} color={Colors.secondary} />
+                        <Text style={[styles.permissionCheckText, { color: activeColors.text }]}>
+                            {lang === 'ar' ? 'تحقق من صلاحية التنبيهات' : 'Check Permission Status'}
+                        </Text>
+                    </TouchableOpacity>
                 </View>
 
                 <View style={[styles.settingItem, { backgroundColor: activeColors.surface }]}>
@@ -268,19 +317,60 @@ const SettingsScreen = ({ lang, theme, onToggleLang, onToggleTheme }: Props) => 
                 </View>
 
                 <View style={styles.infoBox}>
-                    <Text style={[styles.versionText, { color: activeColors.textMuted }]}>Quran Premium v1.1.2</Text>
+                    <Text style={[styles.versionText, { color: activeColors.textMuted }]}>Quran Premium v1.1.3</Text>
                     <Text style={[styles.creditsText, { color: Colors.secondary }]}>Developed with ❤️ for the Ummah</Text>
                 </View>
-            </View>
+            </ScrollView>
+
+            <Modal transparent visible={showReciterModal} animationType="fade" onRequestClose={() => setShowReciterModal(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { backgroundColor: activeColors.background }]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={[styles.modalTitle, { color: activeColors.text }]}>
+                                {lang === 'ar' ? 'اختر القارئ' : 'Select Reciter'}
+                            </Text>
+                            <TouchableOpacity onPress={() => setShowReciterModal(false)}>
+                                <X size={24} color={activeColors.text} />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView style={{ maxHeight: 400 }}>
+                            {RECITERS.map((r, index) => (
+                                <TouchableOpacity
+                                    key={r.id}
+                                    style={[styles.reciterItem, {
+                                        backgroundColor: reciter === r.id ? 'rgba(212, 175, 55, 0.1)' : activeColors.surface,
+                                        borderColor: reciter === r.id ? Colors.secondary : 'transparent',
+                                        borderWidth: 1
+                                    }]}
+                                    onPress={() => {
+                                        setReciter(r.id);
+                                        Storage.saveReciter(r.id);
+                                        setShowReciterModal(false);
+                                    }}
+                                >
+                                    <View style={styles.reciterCircle}>
+                                        <Text style={styles.reciterCircleText}>{index + 1}</Text>
+                                    </View>
+                                    <Text style={[styles.reciterNameText, { color: activeColors.text }]}>
+                                        {lang === 'ar' ? r.nameAr : r.nameEn}
+                                    </Text>
+                                    {reciter === r.id && <CheckCircle size={20} color={Colors.secondary} />}
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
+    flex: { flex: 1 },
     header: { padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
     title: { fontSize: 20, fontWeight: 'bold' },
-    content: { padding: 20 },
+    content: { padding: 20, paddingBottom: 50 },
     settingItem: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -316,7 +406,17 @@ const styles = StyleSheet.create({
     progressBarBg: { height: 6, borderRadius: 3, overflow: 'hidden' },
     progressBarFill: { height: '100%', borderRadius: 3 },
     loaderBox: { alignItems: 'center', justifyContent: 'center' },
-    progressText: { fontSize: 14, fontWeight: 'bold' }
+    progressText: { fontSize: 14, fontWeight: 'bold' },
+    permissionCheckBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 15, paddingTop: 15, borderTopWidth: 1 },
+    permissionCheckText: { fontSize: 13, fontWeight: '600', marginLeft: 8 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+    modalContent: { width: '85%', borderRadius: 25, padding: 25 },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+    modalTitle: { fontSize: 18, fontWeight: 'bold' },
+    reciterItem: { flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 15, marginBottom: 10 },
+    reciterCircle: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(212, 175, 55, 0.2)', alignItems: 'center', justifyContent: 'center', marginRight: 15 },
+    reciterCircleText: { color: Colors.secondary, fontWeight: 'bold', fontSize: 12 },
+    reciterNameText: { flex: 1, fontSize: 15, fontWeight: '600' }
 });
 
 export default SettingsScreen;

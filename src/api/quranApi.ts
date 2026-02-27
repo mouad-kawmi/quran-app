@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { SURAH_LIST_DATA } from '../constants/SurahData';
+import { Storage } from '../utils/storage';
 
 const BASE_URL = 'https://api.alquran.cloud/v1';
 
@@ -25,7 +26,7 @@ export const fetchSurahs = async (): Promise<Surah[]> => {
 
 export const fetchSurahDetail = async (surahNumber: number) => {
     try {
-        // Reduced editions to save space (Uthmani text + Jalalayn tafsir + Pickthall translation)
+        // Reduced editions to save space (Uthmani text + Muyassar tafsir + Pickthall translation)
         const response = await axios.get(`${BASE_URL}/surah/${surahNumber}/editions/quran-uthmani,ar.muyassar,en.pickthall`);
         return response.data.data;
     } catch (error) {
@@ -34,9 +35,47 @@ export const fetchSurahDetail = async (surahNumber: number) => {
     }
 };
 
+export const searchQuranLocal = async (query: string): Promise<any[]> => {
+    const results: any[] = [];
+    const normalizedQuery = query.trim().replace(/[ًٌٍَُِّْٰ]/g, '');
+
+    if (normalizedQuery.length < 3) return [];
+
+    for (let i = 1; i <= 114; i++) {
+        const cached = await Storage.getSurahCache(i);
+        if (!cached || !Array.isArray(cached)) continue;
+
+        // Find in Uthmani text (first edition usually)
+        const uthmani = cached.find((e: any) => e.e.id.includes('uthmani') || e.e.id.includes('simple'));
+        const surahInfo = SURAH_LIST_DATA.find(s => s.number === i);
+
+        if (uthmani && surahInfo) {
+            uthmani.a.forEach((ayah: any) => {
+                const normalizedText = ayah.t.replace(/[ًٌٍَُِّْٰ]/g, '');
+                if (normalizedText.includes(normalizedQuery)) {
+                    results.push({
+                        text: ayah.t,
+                        numberInSurah: ayah.ns,
+                        surah: {
+                            number: i,
+                            name: surahInfo.name,
+                            englishName: surahInfo.englishName
+                        }
+                    });
+                }
+            });
+        }
+        if (results.length >= 50) break; // Limit results for performance
+    }
+    return results;
+};
+
 export const searchQuran = async (query: string): Promise<any[]> => {
+    const cleanText = query.trim();
+    if (!cleanText) return [];
+
     try {
-        const encodedQuery = encodeURIComponent(query.trim());
+        const encodedQuery = encodeURIComponent(cleanText);
 
         // Fetch Arabic and English results in parallel safely
         const [resEn, resAr] = await Promise.allSettled([
@@ -67,10 +106,14 @@ export const searchQuran = async (query: string): Promise<any[]> => {
             }
         });
 
-        return Array.from(uniqueMap.values());
+        const list = Array.from(uniqueMap.values());
+        if (list.length > 0) return list;
+
+        // If API returns no results, try local search
+        return await searchQuranLocal(cleanText);
     } catch (error) {
-        console.error('Core search function error:', error);
-        return [];
+        console.log('Search API failed, falling back to local search...');
+        return await searchQuranLocal(cleanText);
     }
 };
 const LOCAL_HADITHS = [

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import { Search, Book, RotateCcw, Sun, Bookmark, Settings, LucideIcon } from 'lucide-react-native';
+import { Search, Book, RotateCcw, Sun, Bookmark, Settings, Compass, LucideIcon } from 'lucide-react-native';
 import { Colors } from '../../constants/Colors';
 
 interface MenuItem {
@@ -25,6 +25,7 @@ const MoreMenuSheet = ({ isOpen, onClose, activeTab, setActiveTab, lang, activeC
 
     const menuItems: MenuItem[] = [
         { id: 'search', label: isAr ? 'البحث' : 'Search', icon: Search },
+        { id: 'qibla', label: isAr ? 'القبلة' : 'Qibla', icon: Compass },
         { id: 'hadith', label: isAr ? 'أحاديث' : 'Hadiths', icon: Book },
         { id: 'tasbih', label: isAr ? 'التسبيح' : 'Tasbih', icon: RotateCcw },
         { id: 'adhkar', label: isAr ? 'الأذكار' : 'Adhkar', icon: Sun },

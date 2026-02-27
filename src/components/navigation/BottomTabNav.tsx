@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import { BookOpen, Compass, Calendar, Menu, LucideIcon } from 'lucide-react-native';
+import { BookOpen, Compass, Calendar, Menu, Clock, LucideIcon } from 'lucide-react-native';
 import { Colors } from '../../constants/Colors';
 
 interface NavItem {
@@ -22,7 +22,7 @@ const BottomTabNav = ({ activeTab, setActiveTab, lang, activeColors, onMorePress
 
     const tabs: NavItem[] = [
         { id: 'quran', label: isAr ? 'اليوم' : 'Today', icon: BookOpen },
-        { id: 'prayer', label: isAr ? 'القبلة' : 'Qibla', icon: Compass },
+        { id: 'prayer', label: isAr ? 'الصلاة' : 'Prayer', icon: Clock },
         { id: 'khatma', label: isAr ? 'الختمة' : 'Khatma', icon: Calendar },
         { id: 'more', label: isAr ? 'المزيد' : 'More', icon: Menu },
     ];

@@ -1,71 +1,85 @@
 import * as React from 'react';
 import { useEffect, useState, useRef } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, SafeAreaView, TouchableOpacity, Alert, Modal, Share, Image } from 'react-native';
+import {
+    View,
+    Text,
+    FlatList,
+    StyleSheet,
+    ActivityIndicator,
+    TouchableOpacity,
+    Alert,
+    Modal,
+    Dimensions,
+    Platform,
+    StatusBar,
+    ImageBackground,
+    Share,
+    ScrollView
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchSurahDetail } from '../api/quranApi';
 import { Storage } from '../utils/storage';
 import { Colors } from '../constants/Colors';
 import { Translations } from '../constants/Translations';
 import { Audio } from 'expo-av';
-import { ChevronLeft, Play, Pause, Bookmark, Share2, Download, X, Heart, WifiOff, AlertTriangle } from 'lucide-react-native';
+import {
+    ChevronLeft,
+    Play,
+    Pause,
+    Bookmark,
+    BookOpen,
+    Languages,
+    Copy,
+    X,
+    WifiOff,
+    CheckCircle,
+    Share2,
+    Eye,
+    Download
+} from 'lucide-react-native';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
 
-const SurahDetailScreen = ({ route, onBack, lang, theme }: any) => {
+const { width } = Dimensions.get('window');
+
+const SurahDetailScreen = ({ route, onBack, lang, theme, reciter }: any) => {
     const { number, name, arabicName, startAyah } = route.params;
-    const [data, setData] = useState<any>(null);
+    const [pageList, setPageList] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [displayMode, setDisplayMode] = useState<'translation' | 'tafsir'>('translation');
     const [playingAyah, setPlayingAyah] = useState<number | null>(null);
-    const [shareModalVisible, setShareModalVisible] = useState(false);
-    const isInitialScrollDone = useRef(false);
     const [bookmarks, setBookmarks] = useState<any[]>([]);
-    const [ayahToShare, setAyahToShare] = useState<any>(null);
-    const [offlineModalVisible, setOfflineModalVisible] = useState(false);
+    const [selectedAyah, setSelectedAyah] = useState<any>(null);
+    const [optionsModalVisible, setOptionsModalVisible] = useState(false);
+    const [contentModalVisible, setContentModalVisible] = useState(false);
+    const [modalContentType, setModalContentType] = useState<'translation' | 'tafsir'>('translation');
+    const [shareModalVisible, setShareModalVisible] = useState(false);
+    const [allEditionsData, setAllEditionsData] = useState<any[]>([]);
+    const [visibleMetadata, setVisibleMetadata] = useState<any>({ page: 0, juz: 0, surahName: arabicName });
+
     const flatListRef = useRef<any>(null);
     const soundRef = useRef<any>(null);
+    const isInitialScrollDone = useRef(false);
     const viewShotRef = useRef<any>(null);
+    const insets = useSafeAreaInsets();
 
-    const t = Translations[lang];
     const isDark = theme === 'dark';
     const activeColors = isDark ? Colors.dark : Colors.light;
-
-    const handleShareImage = async () => {
-        try {
-            const uri = await captureRef(viewShotRef, {
-                format: 'png',
-                quality: 1.0,
-            });
-
-            await Sharing.shareAsync(uri);
-        } catch (error) {
-            console.error('Sharing failed', error);
-            Alert.alert('Error', 'Failed to generate share card.');
-        }
-    };
-
-    const openShareCard = (ayah: any, textAr: string, textEn: string) => {
-        setAyahToShare({ ...ayah, textAr, textEn });
-        setShareModalVisible(true);
-    };
+    const t = Translations[lang];
 
     useEffect(() => {
         loadDetail();
         loadBookmarks();
-        // Setup Audio Mode for better device support
+
         Audio.setAudioModeAsync({
             playsInSilentModeIOS: true,
             staysActiveInBackground: true,
-            interruptionModeIOS: 1, // DoNotMix
             shouldDuckAndroid: true,
-            interruptionModeAndroid: 1, // DoNotMix
-            playThroughEarpieceAndroid: false,
+            interruptionModeIOS: 1,
+            interruptionModeAndroid: 1,
         }).catch(e => console.log('Audio mode error', e));
 
         return () => {
-            if (soundRef.current) {
-                soundRef.current.unloadAsync();
-            }
+            if (soundRef.current) soundRef.current.unloadAsync();
         };
     }, [number]);
 
@@ -77,422 +91,376 @@ const SurahDetailScreen = ({ route, onBack, lang, theme }: any) => {
     const loadDetail = async () => {
         setLoading(true);
         try {
-            // 1️⃣ نشوفو فالكاش أولاً
-            const cached = await Storage.getSurahCache(number);
-            if (cached) {
-                setData(cached);
-                setLoading(false);
+            // 1. Check Cache
+            let data = await Storage.getSurahCache(number);
 
-                if (startAyah && startAyah > 1) {
+            if (data) {
+                // FALLBACK: If cached data is missing page info (p), refetch it once
+                const hasPageInfo = data[0]?.a[0]?.p;
+                if (!hasPageInfo) {
+                    data = null;
+                }
+            }
+
+            if (!data) {
+                // 2. Fetch all 3 editions (Uthmani, Tafsir Muyassar, Pickthall Translation)
+                data = await fetchSurahDetail(number);
+                // Minimize for storage
+                const minimized = data.map((edition: any) => ({
+                    e: { id: edition.edition.identifier },
+                    a: edition.ayahs.map((a: any) => ({
+                        n: a.number,
+                        ns: a.numberInSurah,
+                        t: a.text,
+                        p: a.page,
+                        j: a.juz,
+                        h: a.hizbQuarter
+                    }))
+                }));
+                Storage.saveSurahCache(number, minimized);
+                data = minimized;
+            }
+
+            setAllEditionsData(data);
+            const uthmaniAyahs = data[0].a;
+
+            // Set initial metadata immediately
+            const firstAyah = uthmaniAyahs[0];
+            if (firstAyah) {
+                setVisibleMetadata({
+                    page: firstAyah.p || firstAyah.page || 0,
+                    juz: firstAyah.j || firstAyah.juz || 0,
+                    surahName: lang === 'ar' ? arabicName : name
+                });
+            }
+
+            const processedPages = processToPages(uthmaniAyahs);
+            setPageList(processedPages);
+
+            // 3. Initial Scroll logic
+            if (startAyah && startAyah > 1) {
+                // Find which page contains startAyah
+                const targetPageIndex = processedPages.findIndex(p => p.ayahs.some((a: any) => a.ns === startAyah));
+                if (targetPageIndex !== -1) {
                     setTimeout(() => {
-                        flatListRef.current?.scrollToIndex({ index: startAyah - 1, animated: true, viewPosition: 0 });
-                        isInitialScrollDone.current = true;
-                    }, 1000);
+                        flatListRef.current?.scrollToIndex({ index: targetPageIndex, animated: false });
+                        setTimeout(() => {
+                            isInitialScrollDone.current = true;
+                        }, 500);
+                    }, 800);
                 } else {
                     isInitialScrollDone.current = true;
                 }
-                return;
-            }
-
-            // 2️⃣ إلا ما لقيناش كاش كنحملو من الAPI
-            const fullDetails = await fetchSurahDetail(number);
-
-            // Critical Fix: Minimize using the same compressed keys as HomeScreen
-            const minimizedDetails = fullDetails.map((edition: any) => ({
-                e: { id: edition.edition.identifier },
-                a: edition.ayahs.map((a: any) => ({
-                    n: a.number,
-                    ns: a.numberInSurah,
-                    t: a.text
-                }))
-            }));
-
-            setData(minimizedDetails);
-
-            // 3️⃣ نحفظوها للمرة الجاي - safer and non-blocking
-            try {
-                await Storage.saveSurahCache(number, minimizedDetails);
-            } catch (e) {
-                console.log("Saving cache failed:", e);
-            }
-
-            if (startAyah && startAyah > 1) {
-                console.log(`[Scroll] Scrolling to Ayah ${startAyah}`);
-                setTimeout(() => {
-                    flatListRef.current?.scrollToIndex({
-                        index: startAyah - 1,
-                        animated: true,
-                        viewPosition: 0
-                    });
-                    isInitialScrollDone.current = true;
-                }, 1200);
             } else {
                 isInitialScrollDone.current = true;
             }
         } catch (error) {
-            console.error(error);
+            console.error("[Mushaf] Error loading surah:", error);
         } finally {
             setLoading(false);
         }
     };
 
+    const processToPages = (ayahs: any[]) => {
+        const pages: any = {};
+        ayahs.forEach((a: any) => {
+            const p = a.p;
+            if (!p) return;
+            if (!pages[p]) pages[p] = [];
+            pages[p].push(a);
+        });
+
+        return Object.keys(pages).sort((a, b) => parseInt(a) - parseInt(b)).map(p => ({
+            page: p,
+            ayahs: pages[p]
+        }));
+    };
+
     const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
-        // Only track and save if the initial scroll (jump to last read) is finished
         if (isInitialScrollDone.current && viewableItems && viewableItems.length > 0) {
-            const firstVisible = viewableItems[0].item;
-            if (firstVisible) {
-                // Critical Fix: Use 'ns' for compressed data or 'numberInSurah' for old data
-                const currentAyahNum = firstVisible.ns || firstVisible.numberInSurah;
+            const firstPage = viewableItems[0].item;
+            const firstAyah = firstPage.ayahs[0];
+            if (firstAyah) {
+                setVisibleMetadata({
+                    page: firstPage.page,
+                    juz: firstAyah.j || firstAyah.juz,
+                    surahName: lang === 'ar' ? arabicName : name
+                });
 
-                if (currentAyahNum) {
-                    Storage.saveLastRead({
-                        number,
-                        name,
-                        arabicName,
-                        ayahNumber: currentAyahNum
-                    });
-                }
+                // Save Last Read
+                Storage.saveLastRead({
+                    number,
+                    name,
+                    arabicName,
+                    ayahNumber: firstAyah.ns
+                });
             }
         }
     }).current;
 
-    const viewabilityConfig = useRef({
-        itemVisiblePercentThreshold: 20 // More sensitive to tracking
-    }).current;
-
-    const playNextAyah = (currentGlobalNumber: number) => {
-        if (!data || !data[0]?.a) return;
-        const ayahs = data[0].a;
-        const currentIndex = ayahs.findIndex((a: any) => a.n === currentGlobalNumber);
-        if (currentIndex !== -1 && currentIndex < ayahs.length - 1) {
-            const nextAyah = ayahs[currentIndex + 1];
-            // Small delay to prevent overlap issues
-            setTimeout(() => {
-                handlePlayAudio(nextAyah.n);
-            }, 300);
-
-            // Scroll to next ayah
-            flatListRef.current?.scrollToIndex({
-                index: currentIndex + 1,
-                animated: true,
-                viewPosition: 0.3
-            });
-        } else {
-            setPlayingAyah(null);
-        }
-    };
-
-    const fastCheckConnection = async () => {
+    const handlePlayAudio = async (ayah: any) => {
         try {
-            // Fast ping to a reliable CDN with a short timeout
-            const controller = new AbortController();
-            const id = setTimeout(() => controller.abort(), 2500);
-            await fetch('https://everyayah.com', { method: 'HEAD', signal: controller.signal });
-            clearTimeout(id);
-            return true;
-        } catch (e) {
-            return false;
-        }
-    };
-
-    const handlePlayAudio = async (ayahGlobalNumber: number) => {
-        try {
-            if (!data) return;
-
-            // Stop current immediately for better responsiveness
-            if (soundRef.current) {
-                await soundRef.current.unloadAsync();
-                soundRef.current = null;
-            }
-
-            if (playingAyah === ayahGlobalNumber) {
+            if (soundRef.current) await soundRef.current.unloadAsync();
+            if (playingAyah === ayah.n) {
                 setPlayingAyah(null);
                 return;
             }
 
-            // Quick network check before loading
-            const isOnline = await fastCheckConnection();
-            if (!isOnline) {
-                setOfflineModalVisible(true);
-                return;
-            }
-
-            setPlayingAyah(ayahGlobalNumber);
-
-            const currentAyah = data[0].a.find((a: any) => a.n === ayahGlobalNumber);
-            if (!currentAyah) return;
-
+            setPlayingAyah(ayah.n);
             const surahPadded = number.toString().padStart(3, '0');
-            const ayahPadded = currentAyah.ns.toString().padStart(3, '0');
-            const audioUrl = `https://everyayah.com/data/Alafasy_128kbps/${surahPadded}${ayahPadded}.mp3`;
+            const ayahPadded = ayah.ns.toString().padStart(3, '0');
+            const audioUrl = `https://everyayah.com/data/${reciter || 'Alafasy_128kbps'}/${surahPadded}${ayahPadded}.mp3`;
 
             const { sound } = await Audio.Sound.createAsync(
                 { uri: audioUrl },
-                { shouldPlay: true, volume: 1.0 },
+                { shouldPlay: true },
                 (status: any) => {
-                    if (status.isLoaded && status.didJustFinish) {
-                        playNextAyah(ayahGlobalNumber);
-                    }
+                    if (status.isLoaded && status.didJustFinish) setPlayingAyah(null);
                 }
             );
-
             soundRef.current = sound;
-        } catch (error) {
-            console.error('[Audio] Error:', error);
+            setOptionsModalVisible(false);
+        } catch (e) {
             setPlayingAyah(null);
-            setOfflineModalVisible(true);
+            Alert.alert(t.offlineTitle, t.offlineMessage);
         }
     };
 
-    const handleBookmark = async (item: any) => {
+    const handleToggleBookmark = async () => {
+        if (!selectedAyah) return;
         const currentBookmarks = await Storage.getBookmarks();
-        const exists = currentBookmarks.find(b => b.surahNumber === number && b.ayahNumber === item.ns);
+        const exists = currentBookmarks.some(b => b.surahNumber === number && b.ayahNumber === selectedAyah.ns);
 
         if (exists) {
-            const filtered = currentBookmarks.filter(b => !(b.surahNumber === number && b.ayahNumber === item.ns));
+            const filtered = currentBookmarks.filter(b => !(b.surahNumber === number && b.ayahNumber === selectedAyah.ns));
             await Storage.saveBookmarks(filtered);
             setBookmarks(filtered);
-            // Optional: Alert.alert(lang === 'ar' ? "تم الإزالة" : "Removed", lang === 'ar' ? "تم إزالة الآية من المفضلة." : "Ayah removed from bookmarks.");
         } else {
             const newBookmark = {
                 surahNumber: number,
                 surahName: name,
-                ayahNumber: item.ns,
-                text: item.t,
+                ayahNumber: selectedAyah.ns,
+                text: selectedAyah.t,
                 date: new Date().toISOString()
             };
             const updated = [...currentBookmarks, newBookmark];
             await Storage.saveBookmarks(updated);
             setBookmarks(updated);
-            // Optional: Alert.alert(lang === 'ar' ? "تم الحفظ" : "Saved", lang === 'ar' ? "تم حفظ الآية في المفضلة." : "Ayah bookmarked successfully.");
+        }
+        setOptionsModalVisible(false);
+    };
+
+    const handleShowContent = (type: 'translation' | 'tafsir') => {
+        setModalContentType(type);
+        setOptionsModalVisible(false);
+        setTimeout(() => setContentModalVisible(true), 100);
+    };
+
+    const handleShare = async () => {
+        setOptionsModalVisible(false);
+        setTimeout(() => setShareModalVisible(true), 100);
+    };
+
+    const handleShareImage = async () => {
+        try {
+            const uri = await captureRef(viewShotRef, { format: 'png', quality: 1.0 });
+            await Sharing.shareAsync(uri);
+        } catch (error) {
+            console.error('Sharing failed', error);
         }
     };
 
-    const renderAyah = ({ item, index }: any) => {
-        if (!data || data.length < 3) return null;
+    const getContentText = () => {
+        if (!selectedAyah || !allEditionsData) return '';
+        const indexInSurah = selectedAyah.ns - 1;
+        if (modalContentType === 'tafsir') {
+            const tafsirEd = allEditionsData.find(e => e.e.id === 'ar.muyassar');
+            return tafsirEd?.a[indexInSurah]?.t || '';
+        } else {
+            const transEd = allEditionsData.find(e => e.e.id === 'en.pickthall');
+            return transEd?.a[indexInSurah]?.t || '';
+        }
+    };
 
-        const getEditionText = (id: string) => {
-            const ed = data.find((e: any) => (e.e?.id || e.edition?.identifier) === id);
-            if (!ed) return '';
-
-            // Try both compressed and uncompressed formats for survival
-            const ayahs = ed.a || ed.ayahs;
-            const ayah = ayahs?.[index];
-            return ayah ? (ayah.t || ayah.text) : '';
-        };
-
-        const translation = getEditionText('en.pickthall');
-        const tafsir = lang === 'ar' ? getEditionText('ar.muyassar') : getEditionText('en.pickthall');
-
-        const isPlaying = playingAyah === item.n;
-
+    const renderPage = ({ item }: any) => {
         return (
-            <View style={[
-                styles.ayahContainer,
-                { backgroundColor: activeColors.surface },
-                isPlaying && { borderColor: Colors.secondary, borderWidth: 1 }
-            ]}>
-                <View style={styles.ayahHeader}>
-                    <View style={[styles.numberBadge, { backgroundColor: isPlaying ? Colors.secondary : activeColors.surfaceLight }]}>
-                        <Text style={[styles.numberText, { color: isPlaying ? Colors.dark.background : activeColors.text }]}>{item.ns}</Text>
+            <View style={styles.pageContainer}>
+                {/* Surah Header if it's the beginning of the Surah */}
+                {item.ayahs[0].ns === 1 && (
+                    <View style={styles.surahDivider}>
+                        <Text style={[styles.surahTitlePro, { color: Colors.secondary }]}>{arabicName}</Text>
+                        {number !== 1 && number !== 9 && (
+                            <Text style={[styles.bismillahPro, { color: Colors.secondary }]}>بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</Text>
+                        )}
                     </View>
-                    <View style={styles.actionIcons}>
-                        <TouchableOpacity onPress={() => openShareCard(item, item.t, translation)} style={styles.iconBtn}>
-                            <Share2 size={20} color={activeColors.textMuted} />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handlePlayAudio(item.n)} style={styles.iconBtn}>
-                            {isPlaying ? (
-                                <Pause size={20} color={Colors.secondary} />
-                            ) : (
-                                <Play size={20} color={Colors.secondary} />
-                            )}
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleBookmark(item)} style={styles.iconBtn}>
-                            <Bookmark
-                                size={20}
-                                color={Colors.secondary}
-                                fill={bookmarks.some(b => b.surahNumber === number && b.ayahNumber === item.ns) ? Colors.secondary : 'transparent'}
-                            />
-                        </TouchableOpacity>
-                    </View>
+                )}
+
+                <View style={styles.mushafPageFrame}>
+                    <Text style={[styles.mushafTextPage, { color: activeColors.text }]}>
+                        {item.ayahs.map((ayah: any) => {
+                            const isPlaying = playingAyah === ayah.n;
+                            const isBookmarked = bookmarks.some(b => b.surahNumber === number && b.ayahNumber === ayah.ns);
+
+                            return (
+                                <Text key={ayah.n} onPress={() => { setSelectedAyah(ayah); setOptionsModalVisible(true); }}>
+                                    <Text style={[
+                                        styles.arabicTextInline,
+                                        {
+                                            color: isPlaying ? Colors.secondary : (isBookmarked ? Colors.accent : activeColors.text),
+                                            backgroundColor: isPlaying ? Colors.secondary + '20' : 'transparent'
+                                        }
+                                    ]}>
+                                        {ayah.t}
+                                    </Text>
+                                    <Text style={[styles.ayahMarkerInline, { color: Colors.secondary }]}>
+                                        {" "}({ayah.ns}){" "}
+                                    </Text>
+                                </Text>
+                            );
+                        })}
+                    </Text>
                 </View>
-                <Text style={[styles.arabicText, { color: activeColors.text }, isPlaying && { color: Colors.secondary }]}>{item.t}</Text>
-                <Text style={[styles.translationText, { color: activeColors.textMuted }]}>
-                    {displayMode === 'translation' ? translation : tafsir}
-                </Text>
+                <Text style={[styles.pageNumberBottom, { color: activeColors.textMuted }]}>{item.page}</Text>
             </View>
         );
     };
 
-    if (loading) {
-        return (
-            <View style={[styles.loadingContainer, { backgroundColor: activeColors.background }]}>
-                <ActivityIndicator size="large" color={Colors.secondary} />
-            </View>
-        );
-    }
-
-    if (!data) {
-        return (
-            <View style={[styles.container, { backgroundColor: activeColors.background }]}>
-                <View style={[styles.header, { backgroundColor: activeColors.surface }]}>
-                    <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                        <ChevronLeft size={28} color={Colors.secondary} />
-                    </TouchableOpacity>
-                    <Text style={[styles.headerTitle, { color: Colors.secondary }]}>
-                        {lang === 'ar' ? arabicName : name}
-                    </Text>
-                    <View style={{ width: 50 }} />
-                </View>
-                <View style={styles.errorContainer}>
-                    <Text style={{ fontSize: 40, marginBottom: 10 }}>📡</Text>
-                    <Text style={[styles.errorText, { color: activeColors.text }]}>
-                        {lang === 'ar' ? 'عذراً، هذه السورة غير محملة.' : 'Sorry, this Surah is not downloaded.'}
-                    </Text>
-                    <Text style={[styles.errorSub, { color: activeColors.textMuted }]}>
-                        {lang === 'ar'
-                            ? 'يجب فتح السورة مرة واحدة على الأقل بالإنترنت ليتم حفظها تلقائياً.'
-                            : 'You need to open this Surah at least once with internet to save it automatically.'}
-                    </Text>
-                    <TouchableOpacity
-                        style={[styles.retryBtn, { backgroundColor: Colors.secondary }]}
-                        onPress={loadDetail}
-                    >
-                        <Text style={{ color: Colors.dark.background, fontWeight: 'bold' }}>{lang === 'ar' ? 'إعادة المحاولة' : 'Try Again'}</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        );
-    }
+    if (loading) return <View style={[styles.center, { backgroundColor: activeColors.background }]}><ActivityIndicator size="large" color={Colors.secondary} /></View>;
 
     return (
         <View style={[styles.container, { backgroundColor: activeColors.background }]}>
-            <View style={[styles.header, { backgroundColor: activeColors.surface }]}>
-                <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                    <ChevronLeft size={28} color={Colors.secondary} />
-                </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: Colors.secondary }]}>
-                    {lang === 'ar' ? arabicName : name}
-                </Text>
-                <View style={{ width: 50 }} />
-            </View>
+            <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
-            <View style={[styles.modeSelector, { backgroundColor: activeColors.surfaceLight }]}>
-                <TouchableOpacity
-                    style={[styles.modeBtn, displayMode === 'translation' && { backgroundColor: Colors.secondary }]}
-                    onPress={() => setDisplayMode('translation')}
-                >
-                    <Text style={[styles.modeText, displayMode === 'translation' && { color: Colors.dark.background }]}>{t.translation}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.modeBtn, displayMode === 'tafsir' && { backgroundColor: Colors.secondary }]}
-                    onPress={() => setDisplayMode('tafsir')}
-                >
-                    <Text style={[styles.modeText, displayMode === 'tafsir' && { color: Colors.dark.background }]}>{t.tafsir}</Text>
-                </TouchableOpacity>
-            </View>
-
-            <FlatList
-                ref={flatListRef}
-                data={data ? (data[0].a || data[0].ayahs) : []}
-                keyExtractor={(item) => (item.n || item.number).toString()}
-                renderItem={renderAyah}
-                onScrollToIndexFailed={(info) => {
-                    setTimeout(() => {
-                        flatListRef.current?.scrollToIndex({ index: info.index, animated: true });
-                    }, 500);
-                }}
-                onViewableItemsChanged={onViewableItemsChanged}
-                viewabilityConfig={viewabilityConfig}
-                contentContainerStyle={styles.listContent}
-                initialNumToRender={startAyah ? startAyah + 5 : 10}
-                maxToRenderPerBatch={10}
-                windowSize={5}
-                ListHeaderComponent={() => (
-                    <View style={styles.bismillahContainer}>
-                        {number !== 1 && <Text style={[styles.bismillahText, { color: Colors.secondary }]}>بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</Text>}
-                    </View>
-                )}
-                ListEmptyComponent={() => (
-                    !loading ? (
-                        <View style={styles.errorContainer}>
-                            <Heart size={40} color={activeColors.textMuted} style={{ marginBottom: 20, opacity: 0.3 }} />
-                            <Text style={[styles.errorText, { color: activeColors.text }]}>
-                                {lang === 'ar' ? 'عذراً، لم يتم تحميل الآيات.' : 'Sorry, ayahs could not be loaded.'}
-                            </Text>
-                            <Text style={[styles.errorSub, { color: activeColors.textMuted }]}>
-                                {lang === 'ar' ? 'تأكد من الاتصال بالإنترنت وحاول مرة أخرى.' : 'Check your connection and try again.'}
-                            </Text>
-                            <TouchableOpacity style={[styles.retryBtn, { backgroundColor: Colors.secondary }]} onPress={loadDetail}>
-                                <Text style={styles.retryBtnText}>{lang === 'ar' ? 'إعادة المحاولة' : 'Retry'}</Text>
-                            </TouchableOpacity>
-                        </View>
-                    ) : null
-                )}
-            />
-
-            {/* SHARE CARD MODAL */}
-            <Modal
-                transparent
-                visible={shareModalVisible}
-                animationType="fade"
-                onRequestClose={() => setShareModalVisible(false)}
+            <ImageBackground
+                source={require('../../assets/mushaf_bg.png')}
+                style={{ flex: 1 }}
+                imageStyle={{ opacity: isDark ? 0.05 : 0.08 }}
             >
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { backgroundColor: activeColors.background }]}>
-                        <View style={styles.modalHeader}>
-                            <Text style={[styles.modalTitle, { color: activeColors.text }]}>
-                                {lang === 'ar' ? 'بطاقة الآية' : 'Ayah Card'}
-                            </Text>
-                            <TouchableOpacity onPress={() => setShareModalVisible(false)}>
-                                <X size={24} color={activeColors.text} />
+                <View style={[styles.proHeader, { borderBottomColor: activeColors.border + '20', backgroundColor: 'transparent', paddingTop: insets.top, height: 70 + insets.top }]}>
+                    <TouchableOpacity onPress={onBack} style={styles.proBackBtn}><ChevronLeft size={28} color={Colors.secondary} /></TouchableOpacity>
+                    <View style={styles.proHeaderInfo}>
+                        <Text style={[styles.proHeaderText, { color: activeColors.textMuted }]}>{lang === 'ar' ? `الجزء ${visibleMetadata.juz}` : `Juz ${visibleMetadata.juz}`}</Text>
+                        <Text style={[styles.proHeaderTitle, { color: Colors.secondary }]}>{visibleMetadata.surahName}</Text>
+                        <Text style={[styles.proHeaderText, { color: activeColors.textMuted }]}>{lang === 'ar' ? `صفحة ${visibleMetadata.page}` : `Page ${visibleMetadata.page}`}</Text>
+                    </View>
+                    <View style={{ width: 40 }} />
+                </View>
+
+                <FlatList
+                    ref={flatListRef}
+                    data={pageList}
+                    keyExtractor={(item) => item.page.toString()}
+                    renderItem={renderPage}
+                    onViewableItemsChanged={onViewableItemsChanged}
+                    viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
+                    style={{ flex: 1 }}
+                    contentContainerStyle={{ paddingHorizontal: 25, paddingTop: 10, paddingBottom: 50 }}
+                    onScrollToIndexFailed={(info) => {
+                        setTimeout(() => {
+                            flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
+                        }, 500);
+                    }}
+                />
+            </ImageBackground>
+
+            {/* Options Modal (Bottom Sheet style) */}
+            <Modal transparent visible={optionsModalVisible} animationType="slide" onRequestClose={() => setOptionsModalVisible(false)}>
+                <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setOptionsModalVisible(false)}>
+                    <View style={[styles.optionsSheet, { backgroundColor: activeColors.surface }]}>
+                        <View style={[styles.sheetHandle, { backgroundColor: activeColors.textMuted }]} />
+                        <Text style={[styles.sheetTitle, { color: Colors.secondary }]}>{arabicName} ({selectedAyah?.ns})</Text>
+
+                        <View style={styles.optionsGrid}>
+                            <TouchableOpacity style={styles.optItem} onPress={() => handlePlayAudio(selectedAyah)}>
+                                <View style={[styles.optIcon, { backgroundColor: Colors.secondary + '15' }]}><Play size={24} color={Colors.secondary} /></View>
+                                <Text style={[styles.optLabel, { color: activeColors.text }]}>{lang === 'ar' ? 'استماع' : 'Audio'}</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity style={styles.optItem} onPress={() => handleShowContent('tafsir')}>
+                                <View style={[styles.optIcon, { backgroundColor: Colors.accent + '15' }]}><BookOpen size={24} color={Colors.accent} /></View>
+                                <Text style={[styles.optLabel, { color: activeColors.text }]}>{lang === 'ar' ? 'تفسير' : 'Tafsir'}</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity style={styles.optItem} onPress={() => handleShowContent('translation')}>
+                                <View style={[styles.optIcon, { backgroundColor: '#4A90E215' }]}><Languages size={24} color="#4A90E2" /></View>
+                                <Text style={[styles.optLabel, { color: activeColors.text }]}>{lang === 'ar' ? 'ترجمة' : 'Translation'}</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity style={styles.optItem} onPress={handleToggleBookmark}>
+                                <View style={[styles.optIcon, { backgroundColor: Colors.secondary + '15' }]}>
+                                    <Bookmark
+                                        size={24}
+                                        color={Colors.secondary}
+                                        fill={bookmarks.some(b => b.surahNumber === number && b.ayahNumber === selectedAyah?.ns) ? Colors.secondary : 'transparent'}
+                                    />
+                                </View>
+                                <Text style={[styles.optLabel, { color: activeColors.text }]}>{lang === 'ar' ? 'حفظ' : 'Save'}</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity style={styles.optItem} onPress={handleShare}>
+                                <View style={[styles.optIcon, { backgroundColor: '#FF6B6B15' }]}><Share2 size={24} color="#FF6B6B" /></View>
+                                <Text style={[styles.optLabel, { color: activeColors.text }]}>{lang === 'ar' ? 'مشاركة' : 'Share'}</Text>
                             </TouchableOpacity>
                         </View>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
 
-                        <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }}>
-                            <View style={[styles.shareCard, { backgroundColor: Colors.secondary }]}>
-                                <Text style={styles.cardLogo}>القرآن الكريم</Text>
-                                <Text style={styles.cardArabic}>{ayahToShare?.textAr}</Text>
-                                <Text style={styles.cardTranslation}>{ayahToShare?.textEn}</Text>
-                                <View style={styles.cardFooter}>
-                                    <Text style={styles.cardRef}>{lang === 'ar' ? arabicName : name} [{ayahToShare?.numberInSurah}]</Text>
-                                </View>
-                            </View>
-                        </ViewShot>
-
-                        <TouchableOpacity
-                            style={[styles.shareBtn, { backgroundColor: Colors.secondary }]}
-                            onPress={handleShareImage}
-                        >
-                            <Download size={20} color={Colors.dark.background} />
-                            <Text style={styles.shareBtnText}>
-                                {lang === 'ar' ? 'مشاركة كصورة' : 'Share as Image'}
+            {/* Content Display Modal (Tafsir/Translation) */}
+            <Modal transparent visible={contentModalVisible} animationType="fade" onRequestClose={() => setContentModalVisible(false)}>
+                <View style={styles.modalOverlayDark}>
+                    <View style={[styles.contentModal, { backgroundColor: activeColors.surface }]}>
+                        <View style={styles.contentHeader}>
+                            <Text style={[styles.contentTitle, { color: Colors.secondary }]}>
+                                {modalContentType === 'tafsir' ? (lang === 'ar' ? 'تفسير الجلالين' : 'Tafsir Muyassar') : (lang === 'ar' ? 'ترجمة معاني' : 'English Translation')}
                             </Text>
+                            <TouchableOpacity onPress={() => setContentModalVisible(false)}><X size={24} color={activeColors.text} /></TouchableOpacity>
+                        </View>
+                        <ScrollView style={styles.contentScroll}>
+                            <Text style={[styles.contentArabic, { color: activeColors.text }]}>{selectedAyah?.t}</Text>
+                            <View style={[styles.contentDivider, { backgroundColor: activeColors.border }]} />
+                            <Text style={[styles.contentText, { color: activeColors.text, textAlign: modalContentType === 'tafsir' ? 'right' : 'left' }]}>
+                                {getContentText()}
+                            </Text>
+                        </ScrollView>
+                        <TouchableOpacity style={[styles.contentCloseBtn, { backgroundColor: Colors.secondary }]} onPress={() => setContentModalVisible(false)}>
+                            <Text style={styles.contentCloseText}>{lang === 'ar' ? 'إغلاق' : 'Close'}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
 
-            {/* OFFLINE ERROR MODAL */}
-            <Modal
-                transparent
-                visible={offlineModalVisible}
-                animationType="slide"
-                onRequestClose={() => setOfflineModalVisible(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.offlineCard, { backgroundColor: activeColors.background }]}>
-                        <View style={[styles.offlineIconCircle, { backgroundColor: 'rgba(255,152,0,0.1)' }]}>
-                            <WifiOff size={40} color="#FF9800" />
+            {/* Share Modal */}
+            <Modal transparent visible={shareModalVisible} animationType="fade" onRequestClose={() => setShareModalVisible(false)}>
+                <View style={styles.modalOverlayDark}>
+                    <View style={[styles.shareModalContent, { backgroundColor: activeColors.surface }]}>
+                        <View style={styles.contentHeader}>
+                            <Text style={[styles.contentTitle, { color: activeColors.text }]}>{lang === 'ar' ? 'مشاركة الآية' : 'Share Ayah'}</Text>
+                            <TouchableOpacity onPress={() => setShareModalVisible(false)}><X size={24} color={activeColors.text} /></TouchableOpacity>
                         </View>
-                        <Text style={[styles.offlineTitle, { color: activeColors.text }]}>{t.offlineTitle}</Text>
-                        <Text style={[styles.offlineMessage, { color: activeColors.textMuted }]}>{t.offlineMessage}</Text>
+
+                        <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }}>
+                            <View style={[styles.shareCardPro, { backgroundColor: Colors.secondary }]}>
+                                <Text style={styles.shareCardHeader}>القرآن الكريم</Text>
+                                <Text style={styles.shareCardArabic}>{selectedAyah?.t}</Text>
+                                <Text style={styles.shareCardRef}>{arabicName} [{selectedAyah?.ns}]</Text>
+                            </View>
+                        </ViewShot>
+
+                        <TouchableOpacity style={[styles.shareActionBtn, { backgroundColor: Colors.secondary }]} onPress={handleShareImage}>
+                            <Download size={20} color="#000" />
+                            <Text style={styles.shareActionText}>{lang === 'ar' ? 'حفظ كصورة' : 'Save as Image'}</Text>
+                        </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={[styles.offlineCloseBtn, { backgroundColor: Colors.secondary }]}
-                            onPress={() => setOfflineModalVisible(false)}
+                            style={[styles.shareActionBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: Colors.secondary }]}
+                            onPress={() => {
+                                Share.share({ message: `${selectedAyah?.t}\n\n[${arabicName} : ${selectedAyah?.ns}]` });
+                                setShareModalVisible(false);
+                            }}
                         >
-                            <Text style={styles.offlineCloseText}>{lang === 'ar' ? 'فهمت' : 'I Understand'}</Text>
+                            <Copy size={20} color={Colors.secondary} />
+                            <Text style={[styles.shareActionText, { color: Colors.secondary }]}>{lang === 'ar' ? 'نسخ النص' : 'Copy Text'}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -503,49 +471,46 @@ const SurahDetailScreen = ({ route, onBack, lang, theme }: any) => {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: { padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    backButton: { padding: 8 },
-    backButtonText: { fontSize: 16 },
-    headerTitle: { fontSize: 18, fontWeight: 'bold' },
-    modeSelector: { flexDirection: 'row', margin: 16, borderRadius: 12, padding: 4 },
-    modeBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 10 },
-    modeText: { fontSize: 14, fontWeight: 'bold', color: '#B7D1C4' },
-    listContent: { padding: 16 },
-    bismillahContainer: { paddingVertical: 20, alignItems: 'center' },
-    bismillahText: { fontSize: 24, textAlign: 'center' },
-    ayahContainer: { marginBottom: 20, padding: 20, borderRadius: 20, shadowColor: '#000', shadowOpacity: 0.05, elevation: 1 },
-    ayahHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15, alignItems: 'center' },
-    actionIcons: { flexDirection: 'row' },
-    iconBtn: { marginLeft: 15 },
-    numberBadge: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-    numberText: { fontSize: 12, fontWeight: 'bold' },
-    arabicText: { fontSize: 24, lineHeight: 45, textAlign: 'right', marginBottom: 15 },
-    translationText: { fontSize: 15, lineHeight: 24 },
-    errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-    errorText: { fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 10 },
-    errorSub: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
-    retryBtn: { paddingVertical: 12, paddingHorizontal: 40, borderRadius: 12, marginTop: 25 },
-    retryBtnText: { color: '#081C15', fontWeight: 'bold', fontSize: 16 },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 30 },
-    modalContent: { borderRadius: 25, padding: 20 },
-    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-    modalTitle: { fontSize: 18, fontWeight: 'bold' },
-    shareCard: { padding: 30, borderRadius: 25, alignItems: 'center' },
-    cardLogo: { color: 'rgba(8, 28, 21, 0.5)', fontWeight: 'bold', fontSize: 12, marginBottom: 20, letterSpacing: 2 },
-    cardArabic: { color: '#081C15', fontSize: 22, fontWeight: 'bold', textAlign: 'center', lineHeight: 40, marginBottom: 20 },
-    cardTranslation: { color: '#081C15', fontSize: 14, textAlign: 'center', lineHeight: 22, opacity: 0.8 },
-    cardFooter: { marginTop: 30, width: '100%', borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.1)', paddingTop: 15 },
-    cardRef: { color: '#081C15', fontSize: 13, fontWeight: 'bold', textAlign: 'center' },
-    shareBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 18, borderRadius: 15, marginTop: 20 },
-    shareBtnText: { color: '#081C15', fontWeight: 'bold', fontSize: 16, marginLeft: 10 },
-    // Offline Styles
-    offlineCard: { padding: 30, borderRadius: 30, alignItems: 'center' },
-    offlineIconCircle: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
-    offlineTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 10 },
-    offlineMessage: { fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: 25 },
-    offlineCloseBtn: { paddingVertical: 15, paddingHorizontal: 40, borderRadius: 15, width: '100%', alignItems: 'center' },
-    offlineCloseText: { color: '#081C15', fontWeight: 'bold', fontSize: 16 },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    proHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, borderBottomWidth: 1, zIndex: 10 },
+    proBackBtn: { width: 45, height: 45, justifyContent: 'center', alignItems: 'center' },
+    proHeaderInfo: { flex: 1, alignItems: 'center' },
+    proHeaderTitle: { fontSize: 18, fontWeight: 'bold' },
+    proHeaderText: { fontSize: 11, fontWeight: '600', opacity: 0.6 },
+    pageContainer: { marginBottom: 60 },
+    surahDivider: { alignItems: 'center', marginTop: 20, marginBottom: 40, borderBottomWidth: 1, borderBottomColor: 'rgba(212, 175, 55, 0.1)', paddingBottom: 25 },
+    surahTitlePro: { fontSize: 32, fontWeight: 'bold', marginBottom: 12 },
+    bismillahPro: { fontSize: 26, textAlign: 'center' },
+    mushafPageFrame: { paddingHorizontal: 5 },
+    mushafTextPage: { textAlign: 'right', writingDirection: 'rtl' },
+    arabicTextInline: { fontSize: 26, lineHeight: 62, fontWeight: '500', fontFamily: Platform.OS === 'android' ? 'serif' : 'System' },
+    ayahMarkerInline: { fontSize: 18, fontWeight: 'bold' },
+    pageNumberBottom: { textAlign: 'center', marginTop: 25, fontSize: 13, fontWeight: 'bold', opacity: 0.4 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+    modalOverlayDark: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    optionsSheet: { borderTopLeftRadius: 35, borderTopRightRadius: 35, padding: 25, paddingBottom: 60 },
+    sheetHandle: { width: 45, height: 6, borderRadius: 3, alignSelf: 'center', marginBottom: 25, opacity: 0.15 },
+    sheetTitle: { fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 30 },
+    optionsGrid: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap' },
+    optItem: { alignItems: 'center', width: '20%' },
+    optIcon: { width: 55, height: 55, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
+    optLabel: { fontSize: 11, fontWeight: 'bold' },
+    contentModal: { width: '100%', borderRadius: 25, padding: 20, maxHeight: '80%' },
+    contentHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+    contentTitle: { fontSize: 18, fontWeight: 'bold' },
+    contentScroll: { marginBottom: 20 },
+    contentArabic: { fontSize: 22, textAlign: 'right', lineHeight: 40, marginBottom: 20 },
+    contentDivider: { height: 1, width: '100%', marginBottom: 20, opacity: 0.1 },
+    contentText: { fontSize: 17, lineHeight: 28 },
+    contentCloseBtn: { paddingVertical: 15, borderRadius: 15, alignItems: 'center' },
+    contentCloseText: { fontWeight: 'bold', fontSize: 16, color: '#000' },
+    shareModalContent: { width: '100%', borderRadius: 30, padding: 25 },
+    shareCardPro: { padding: 30, borderRadius: 25, alignItems: 'center', marginBottom: 25 },
+    shareCardHeader: { color: 'rgba(0,0,0,0.4)', fontWeight: 'bold', fontSize: 12, marginBottom: 20, letterSpacing: 2 },
+    shareCardArabic: { color: '#000', fontSize: 22, fontWeight: 'bold', textAlign: 'center', lineHeight: 45, marginBottom: 25 },
+    shareCardRef: { color: '#000', fontSize: 14, fontWeight: 'bold', borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.1)', paddingTop: 15, width: '100%', textAlign: 'center' },
+    shareActionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, borderRadius: 15, marginBottom: 12 },
+    shareActionText: { fontWeight: 'bold', fontSize: 15, marginLeft: 10, color: '#000' }
 });
 
 export default SurahDetailScreen;

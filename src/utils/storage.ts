@@ -9,12 +9,20 @@ const KEYS = {
     TASBIH: '@quran_premium_tasbih',
     SURAH_CACHE_PREFIX: '@quran_premium_surah_cache_',
     SURAH_LIST: '@quran_premium_surah_list',
-    PRAYER_TIMES: '@quran_premium_prayer_times',
-    FULL_SYNC: '@quran_premium_full_sync',
+    PRAYER_TIMES: '@prayerTimes',
+    FULL_SYNC: '@fullSync',
     JUZ_CACHE_PREFIX: '@quran_premium_juz_cache_',
+    PUSH_TOKEN: '@quran_premium_push_token',
+    RECITER: '@reciter'
 };
 
 export const Storage = {
+    async savePushToken(token: string) {
+        await AsyncStorage.setItem(KEYS.PUSH_TOKEN, token);
+    },
+    async getPushToken() {
+        return await AsyncStorage.getItem(KEYS.PUSH_TOKEN);
+    },
     async saveLang(lang: string) {
         await AsyncStorage.setItem(KEYS.LANG, lang);
     },
@@ -91,8 +99,8 @@ export const Storage = {
         return data ? JSON.parse(data) : null;
     },
 
-    async savePrayerTimes(times: any) {
-        const data = { times, date: new Date().toDateString() };
+    async savePrayerTimes(times: any, city?: string) {
+        const data = { times, city, date: new Date().toDateString() };
         await AsyncStorage.setItem(KEYS.PRAYER_TIMES, JSON.stringify(data));
     },
     async getPrayerTimes(): Promise<any | null> {
@@ -108,9 +116,20 @@ export const Storage = {
         return data === 'true';
     },
 
+    async saveReciter(reciterId: string) {
+        await AsyncStorage.setItem(KEYS.RECITER, reciterId);
+    },
+    async getReciter(): Promise<string> {
+        const data = await AsyncStorage.getItem(KEYS.RECITER);
+        return data ? data : 'Alafasy_128kbps'; // Default
+    },
+
     async clearAllCache() {
         const allKeys = await AsyncStorage.getAllKeys();
-        const cacheKeys = allKeys.filter(key => key.startsWith(KEYS.SURAH_CACHE_PREFIX));
+        const cacheKeys = allKeys.filter(key => 
+            key.startsWith(KEYS.SURAH_CACHE_PREFIX) || 
+            key.startsWith(KEYS.JUZ_CACHE_PREFIX)
+        );
         await AsyncStorage.multiRemove(cacheKeys);
         await AsyncStorage.removeItem(KEYS.FULL_SYNC);
     },

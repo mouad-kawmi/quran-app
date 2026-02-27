@@ -5,7 +5,7 @@
     "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": false,
     "updates": {
       "url": "https://u.expo.dev/7ac7a663-bd7f-4d1d-b01a-68ea92361c57",
@@ -19,16 +19,26 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#081C15"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "userInterfaceStyle": "dark",
+      "splash": {
+        "backgroundColor": "#081C15"
+      }
     },
     "android": {
       "package": "com.mouad.quranpremium",
+      "userInterfaceStyle": "dark",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#081C15"
+      },
+      "splash": {
+        "backgroundColor": "#081C15",
+        "resizeMode": "contain",
+        "image": "./assets/splash-icon.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -42,6 +52,13 @@
       }
     },
     "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#D4AF37"
+        }
+      ],
       [
         "expo-build-properties",
         {
