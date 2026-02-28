@@ -1,16 +1,16 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, I18nManager } from 'react-native';
 
-const SettingItem = ({ label, value, onPress, activeColors, icon, children }: any) => {
+const SettingItem = ({ label, value, onPress, activeColors, icon, children, btnText, isAr }: any) => {
     return (
-        <View style={[styles.item, { backgroundColor: activeColors.surface }]}>
-            <View style={{ flex: 1 }}>
-                <Text style={[styles.label, { color: activeColors.text }]}>{label}</Text>
-                <Text style={[styles.value, { color: activeColors.textMuted }]}>{value}</Text>
+        <View style={[styles.item, { backgroundColor: activeColors.surface, flexDirection: isAr ? 'row-reverse' : 'row' }]}>
+            <View style={{ flex: 1, alignItems: isAr ? 'flex-end' : 'flex-start' }}>
+                <Text style={[styles.label, { color: activeColors.text, textAlign: isAr ? 'right' : 'left' }]}>{label}</Text>
+                {value ? <Text style={[styles.value, { color: activeColors.textMuted, textAlign: isAr ? 'right' : 'left' }]}>{value}</Text> : null}
             </View>
             {children ? children : (
-                <TouchableOpacity style={styles.btn} onPress={onPress}>
-                    {icon ? icon : <Text style={styles.btnText}>Change</Text>}
+                <TouchableOpacity style={[styles.btn, isAr ? { marginRight: 15 } : { marginLeft: 15 }]} onPress={onPress}>
+                    {icon ? icon : <Text style={styles.btnText}>{btnText || "Change"}</Text>}
                 </TouchableOpacity>
             )}
         </View>

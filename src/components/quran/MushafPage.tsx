@@ -1,5 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet, Platform, Dimensions } from 'react-native';
+
+const { height } = Dimensions.get('window');
 import { Colors } from '../../constants/Colors';
 
 interface Props {
@@ -15,16 +17,18 @@ interface Props {
 const MushafPage = ({ item, arabicName, number, activeColors, playingAyah, bookmarks, onAyahPress }: Props) => {
     return (
         <View style={styles.pageContainer}>
-            {item.ayahs[0].ns === 1 && (
-                <View style={styles.surahDivider}>
-                    <Text style={[styles.surahTitle, { color: Colors.secondary }]}>{arabicName}</Text>
-                    {number !== 1 && number !== 9 && (
-                        <Text style={[styles.bismillah, { color: Colors.secondary }]}>بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</Text>
-                    )}
-                </View>
-            )}
-
             <View style={styles.mushafPageFrame}>
+                {item.ayahs[0].ns === 1 && (
+                    <View style={styles.surahBanner}>
+                        <View style={styles.bannerBorder}>
+                            <Text style={styles.surahTitle}>{arabicName}</Text>
+                        </View>
+                        {number !== 1 && number !== 9 && (
+                            <Text style={styles.bismillah}>بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</Text>
+                        )}
+                    </View>
+                )}
+
                 <Text style={[styles.mushafText, { color: activeColors.text }]}>
                     {item.ayahs.map((ayah: any) => {
                         const isPlaying = playingAyah === ayah.n;
@@ -55,15 +59,70 @@ const MushafPage = ({ item, arabicName, number, activeColors, playingAyah, bookm
 };
 
 const styles = StyleSheet.create({
-    pageContainer: { marginBottom: 60 },
-    surahDivider: { alignItems: 'center', marginTop: 20, marginBottom: 40, borderBottomWidth: 1, borderBottomColor: 'rgba(212, 175, 55, 0.1)', paddingBottom: 25 },
-    surahTitle: { fontSize: 32, fontWeight: 'bold', marginBottom: 12 },
-    bismillah: { fontSize: 26, textAlign: 'center' },
-    mushafPageFrame: { paddingHorizontal: 5 },
-    mushafText: { textAlign: 'right', writingDirection: 'rtl' },
-    arabicText: { fontSize: 26, lineHeight: 62, fontWeight: '500', fontFamily: Platform.OS === 'android' ? 'serif' : 'System' },
-    marker: { fontSize: 18, fontWeight: 'bold' },
-    pageNumber: { textAlign: 'center', marginTop: 25, fontSize: 13, fontWeight: 'bold', opacity: 0.4 },
+    pageContainer: {
+        marginBottom: 40,
+        paddingHorizontal: 1,
+        minHeight: height * 0.72,
+    },
+    mushafPageFrame: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: 'rgba(212, 175, 55, 0.15)',
+        borderRadius: 8,
+        padding: 16,
+        paddingTop: 24,
+        backgroundColor: 'rgba(0,0,0,0.02)',
+    },
+    surahBanner: {
+        alignItems: 'center',
+        marginBottom: 2,
+    },
+    bannerBorder: {
+        borderWidth: 1,
+        borderColor: Colors.secondary,
+        paddingVertical: 12,
+        paddingHorizontal: 40,
+        borderRadius: 4,
+        borderStyle: 'dashed',
+        marginBottom: 15,
+        backgroundColor: 'rgba(212, 175, 55, 0.05)',
+    },
+    surahTitle: {
+        fontSize: 34,
+        fontWeight: 'bold',
+        color: Colors.secondary,
+        fontFamily: Platform.OS === 'ios' ? 'Amiri' : 'serif',
+        textAlign: 'center',
+    },
+    bismillah: {
+        fontSize: 26,
+        textAlign: 'center',
+        color: Colors.secondary,
+        fontFamily: Platform.OS === 'ios' ? 'Amiri' : 'serif',
+        marginTop: 5,
+        letterSpacing: 1,
+    },
+    mushafText: {
+        textAlign: 'justify',
+        writingDirection: 'rtl',
+    },
+    arabicText: {
+        fontSize: 27,
+        lineHeight: 52,
+        fontWeight: '500',
+        fontFamily: Platform.OS === 'ios' ? 'Amiri' : 'serif',
+    },
+    marker: {
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    pageNumber: {
+        textAlign: 'center',
+        marginTop: 15,
+        fontSize: 14,
+        fontWeight: '600',
+        opacity: 0.6,
+    },
 });
 
 export default MushafPage;

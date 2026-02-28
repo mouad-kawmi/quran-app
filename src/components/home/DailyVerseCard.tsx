@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Heart } from 'lucide-react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { Heart, Share2, Copy } from 'lucide-react-native';
 import { Colors } from '../../constants/Colors';
 import { RemoteVerse } from '../../api/remoteContent';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface Props {
     dailyVerse: RemoteVerse;
@@ -15,62 +16,130 @@ interface Props {
  */
 const DailyVerseCard = ({ dailyVerse, lang, activeColors }: Props) => {
     return (
-        <View style={[styles.card, { backgroundColor: Colors.secondary + '15' }]}>
+        <LinearGradient
+            colors={['#1B4332', '#081C15']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.card}
+        >
             <View style={styles.header}>
-                <Heart size={16} color={Colors.secondary} fill={Colors.secondary} />
-                <Text style={[styles.title, { color: Colors.secondary }]}>
-                    {lang === 'ar' ? 'آية اليوم' : 'Verse of the Day'}
-                </Text>
+                <View style={styles.headerLeft}>
+                    <View style={styles.iconCircle}>
+                        <Heart size={14} color={Colors.secondary} fill={Colors.secondary} />
+                    </View>
+                    <Text style={styles.title}>
+                        {lang === 'ar' ? 'آية اليوم' : 'Verse of the Day'}
+                    </Text>
+                </View>
+                <View style={styles.headerRight}>
+                    <Copy size={18} color="rgba(255,255,255,0.6)" style={{ marginRight: 15 }} />
+                    <Share2 size={18} color="rgba(255,255,255,0.6)" />
+                </View>
             </View>
 
-            <Text style={[styles.verseText, { color: activeColors.text }]}>
-                {dailyVerse.verse}
-            </Text>
+            <View style={styles.content}>
+                <Text style={styles.verseText}>
+                    {dailyVerse.verse}
+                </Text>
 
-            <Text style={[styles.translationText, { color: activeColors.textMuted }]}>
-                {dailyVerse.translation}
-            </Text>
+                <View style={styles.divider} />
 
-            <Text style={[styles.referenceText, { color: Colors.secondary }]}>
-                {dailyVerse.surah} : {dailyVerse.ayah}
-            </Text>
-        </View>
+                <Text style={styles.translationText}>
+                    {dailyVerse.translation}
+                </Text>
+
+                <View style={styles.footer}>
+                    <View style={styles.surahBadge}>
+                        <Text style={styles.referenceText}>
+                            {dailyVerse.surah} • {dailyVerse.ayah}
+                        </Text>
+                    </View>
+                </View>
+            </View>
+        </LinearGradient>
     );
 };
 
 const styles = StyleSheet.create({
     card: {
-        padding: 20,
-        borderRadius: 20,
-        marginBottom: 20,
-        marginTop: 5,
+        borderRadius: 28,
+        padding: 24,
+        marginBottom: 25,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 15,
+        elevation: 8,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 12
+        justifyContent: 'space-between',
+        marginBottom: 20
+    },
+    headerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    iconCircle: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: 'rgba(212, 175, 55, 0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 10,
     },
     title: {
         fontSize: 14,
-        fontWeight: 'bold',
-        marginLeft: 8
+        fontWeight: '700',
+        color: Colors.secondary,
+        letterSpacing: 0.5,
+    },
+    content: {
+        alignItems: 'center',
     },
     verseText: {
-        fontSize: 20,
+        fontSize: 24,
         fontWeight: 'bold',
-        textAlign: 'right',
-        lineHeight: 32,
-        marginBottom: 10
+        color: '#FFFFFF',
+        textAlign: 'center',
+        lineHeight: 40,
+        fontFamily: Platform.OS === 'ios' ? 'Amiri' : 'serif',
+    },
+    divider: {
+        width: 40,
+        height: 2,
+        backgroundColor: 'rgba(212, 175, 55, 0.3)',
+        marginVertical: 15,
+        borderRadius: 1,
     },
     translationText: {
-        fontSize: 14,
-        lineHeight: 22,
-        marginBottom: 10
+        fontSize: 16,
+        color: 'rgba(255, 255, 255, 0.8)',
+        textAlign: 'center',
+        lineHeight: 24,
+        marginBottom: 20,
+        fontStyle: 'italic',
+    },
+    footer: {
+        width: '100%',
+        alignItems: 'flex-end',
+    },
+    surahBadge: {
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 12,
     },
     referenceText: {
         fontSize: 12,
-        fontWeight: 'bold',
-        textAlign: 'right'
+        fontWeight: '700',
+        color: Colors.secondary,
     },
 });
 

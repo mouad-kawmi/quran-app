@@ -61,3 +61,27 @@ export const getHijriDate = (lang: string) => {
         return `${monthsEn[m_h - 1]} ${d_h}, ${y_h}`;
     }
 };
+
+export const getFullGregorianDate = (lang: string) => {
+    const date = new Date();
+    const options: Intl.DateTimeFormatOptions = {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    };
+
+    if (lang === 'ar') {
+        const daysAr = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+        const monthsAr = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+
+        const dayName = daysAr[date.getDay()];
+        const day = date.getDate();
+        const monthName = monthsAr[date.getMonth()];
+        const year = date.getFullYear();
+
+        return `${dayName} ${day} ${monthName} ${year}`;
+    }
+
+    return date.toLocaleDateString('en-US', options);
+};

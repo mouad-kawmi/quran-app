@@ -14,7 +14,8 @@ const KEYS = {
     JUZ_CACHE_PREFIX: '@quran_premium_juz_cache_',
     PUSH_TOKEN: '@quran_premium_push_token',
     RECITER: '@reciter',
-    LAST_LOCATION: '@lastLocation'
+    LAST_LOCATION: '@lastLocation',
+    ONBOARDING: '@onboarding_completed'
 };
 
 export const Storage = {
@@ -145,5 +146,13 @@ export const Storage = {
 
     async resetEverything() {
         await AsyncStorage.clear();
+    },
+
+    async setOnboardingCompleted(status: boolean) {
+        await AsyncStorage.setItem(KEYS.ONBOARDING, status ? 'true' : 'false');
+    },
+    async isOnboardingCompleted(): Promise<boolean> {
+        const data = await AsyncStorage.getItem(KEYS.ONBOARDING);
+        return data === 'true';
     },
 };

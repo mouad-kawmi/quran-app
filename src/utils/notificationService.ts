@@ -98,17 +98,15 @@ export const NotificationService = {
             // 1. Daily Morning Quran Reminder
             await Notifications.scheduleNotificationAsync({
                 content: {
-                    title: isAr ? "آية اليوم 📖" : "Ayah of the Day 📖",
-                    body: isAr ? "نور يومك بقراءة الورد اليومي" : "Illuminate your day with Quran",
+                    title: isAr ? "✨ إشراقة قرآنية" : "✨ Quranic Light",
+                    body: isAr ? "نور يومك بآيات من الذكر الحكيم.. اقرأ وردك اليومي 📖" : "Illuminate your day with verses from the Holy Quran 📖",
                     sound: true,
-                    priority: Notifications.AndroidNotificationPriority.HIGH,
-                    android: { channelId: 'daily' }
-                } as any,
+                },
                 trigger: {
+                    type: Notifications.SchedulableTriggerInputTypes.DAILY,
                     hour: 9,
                     minute: 0,
-                    repeats: true,
-                } as Notifications.NotificationTriggerInput,
+                },
             });
 
             // 2. Schedule Prayers if we have timings (passed or from storage)
@@ -145,22 +143,51 @@ export const NotificationService = {
 
             if (isNaN(hours) || isNaN(minutes)) continue;
 
+            const prayerTitlesAr: any = {
+                Fajr: 'الصلاة خير من النوم 🌅',
+                Dhuhr: 'حان الآن موعد أذان الظهر ☀️',
+                Asr: 'حان الآن موعد أذان العصر 🌤️',
+                Maghrib: 'حان الآن موعد أذان المغرب 🌇',
+                Isha: 'حان الآن موعد أذان العشاء 🌌'
+            };
+
             await Notifications.scheduleNotificationAsync({
                 content: {
-                    title: isAr ? `حان الآن موعد صلاة ${t[prayer]}` : `It is now time for ${t[prayer]} prayer`,
-                    body: isAr ? `حي على الصلاة، حي على الفلاح` : `Come to prayer, come to success`,
+                    title: isAr ? prayerTitlesAr[prayer] : `Time for ${t[prayer]} prayer 🕌`,
+                    body: isAr ? `حَيَّ عَلَى الصَّلاةِ.. حَيَّ عَلَى الْفَلاحِ 🕋` : `Come to prayer, come to success 🕋`,
                     sound: true,
-                    priority: Notifications.AndroidNotificationPriority.MAX,
                     categoryIdentifier: 'prayer',
-                    android: { channelId: 'prayer' }
-                } as any,
+                },
                 trigger: {
+                    type: Notifications.SchedulableTriggerInputTypes.DAILY,
                     hour: hours,
                     minute: minutes,
-                    repeats: true,
-                } as Notifications.NotificationTriggerInput,
+                },
             });
             console.log(`[Notifications] Scheduled ${prayer} at ${hours}:${minutes}`);
         }
+    },
+
+    async testNotification(lang: 'ar' | 'en') {
+        const isAr = lang === 'ar';
+        const hasPermission = await this.registerForNotifications();
+        if (!hasPermission) {
+            import('react-native').then(({ Alert }) => {
+                Alert.alert(isAr ? 'تنبيه' : 'Alert', isAr ? 'الرجاء تفعيل الإشعارات من إعدادات الهاتف' : 'Please enable notifications in settings');
+            });
+            return;
+        }
+
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title: isAr ? "✨ تجربة الإشعارات تمت بنجاح" : "✨ Test Successful",
+                body: isAr ? "نظام الإشعارات والأذان يعمل الآن بشكل ممتاز فالتطبيق! 🕌" : "The notification and adhan system is now working perfectly! 🕌",
+                sound: true,
+            },
+            trigger: {
+                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                seconds: 2
+            },
+        });
     }
 };

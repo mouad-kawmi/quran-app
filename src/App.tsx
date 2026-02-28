@@ -13,6 +13,8 @@ import { useAppSettings } from './hooks/useAppSettings';
 import BottomTabNav from './components/navigation/BottomTabNav';
 import MoreMenuSheet from './components/navigation/MoreMenuSheet';
 import Navigator from './navigation/Navigator';
+import AnimatedSplashScreen from './components/common/AnimatedSplashScreen';
+import Onboarding from './components/common/Onboarding';
 
 // Notification Setup
 Notifications.setNotificationHandler({
@@ -32,6 +34,8 @@ export default function App() {
   const [selectedSurah, setSelectedSurah] = useState<any>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [homeRefresh, setHomeRefresh] = useState(0);
+  const [showSplash, setShowSplash] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Khatma State
   const [khatma, setKhatma] = useState<any>({ isStarted: false, currentDay: 1, totalDays: 30, history: [], juzs: [] });
@@ -42,6 +46,9 @@ export default function App() {
       const savedKhatma = await Storage.getKhatma();
       if (savedKhatma) setKhatma({ ...khatma, ...savedKhatma });
       checkForUpdates(lang);
+
+      const onboardingDone = await Storage.isOnboardingCompleted();
+      setShowOnboarding(!onboardingDone);
     };
     init();
   }, []);
@@ -75,6 +82,22 @@ export default function App() {
   };
 
   const activeColors = theme === 'dark' ? Colors.dark : Colors.light;
+
+  if (showSplash) {
+    return <AnimatedSplashScreen lang={lang} onAnimationComplete={() => setShowSplash(false)} />;
+  }
+
+  if (showOnboarding) {
+    return (
+      <Onboarding
+        lang={lang}
+        onFinish={async () => {
+          await Storage.setOnboardingCompleted(true);
+          setShowOnboarding(false);
+        }}
+      />
+    );
+  }
 
   return (
     <SafeAreaProvider>

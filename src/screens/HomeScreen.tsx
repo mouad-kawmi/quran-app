@@ -5,7 +5,7 @@ import { fetchSurahs, Surah } from '../api/quranApi';
 import SurahCard from '../components/SurahCard';
 import { Translations } from '../constants/Translations';
 import { Storage } from '../utils/storage';
-import { getHijriDate } from '../utils/dateUtils';
+import { getHijriDate, getFullGregorianDate } from '../utils/dateUtils';
 import { RemoteContentService, RemoteVerse } from '../api/remoteContent';
 import { useQuranSync } from '../hooks/useQuranSync';
 
@@ -14,6 +14,7 @@ import HomeHeader from '../components/home/HomeHeader';
 import DailyVerseCard from '../components/home/DailyVerseCard';
 import LastReadCard from '../components/home/LastReadCard';
 import SyncStatusBanner from '../components/home/SyncStatusBanner';
+import CalendarModal from '../components/common/CalendarModal';
 
 interface Props {
     onSelectSurah: (num: number, name: string, arName: string, start?: number) => void;
@@ -33,6 +34,7 @@ const HomeScreen = ({ onSelectSurah, lang, theme, refreshTrigger }: Props) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [lastRead, setLastRead] = useState<any>(null);
     const [dailyVerse, setDailyVerse] = useState<RemoteVerse | null>(null);
+    const [isCalendarVisible, setCalendarVisible] = useState(false);
 
     useEffect(() => {
         const loadAll = async () => {
@@ -78,8 +80,18 @@ const HomeScreen = ({ onSelectSurah, lang, theme, refreshTrigger }: Props) => {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: activeColors.background }]}>
-            <HomeHeader greeting={greeting} hijriDate={getHijriDate(lang)} title={t.quran}
-                searchQuery={searchQuery} setSearchQuery={setSearchQuery} onSearch={handleSearch} placeholder={t.searchSurah} activeColors={activeColors} />
+            <HomeHeader
+                greeting={greeting}
+                gregorianDate={getFullGregorianDate(lang)}
+                hijriDate={getHijriDate(lang)}
+                title={t.quran}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                onSearch={handleSearch}
+                placeholder={t.searchSurah}
+                activeColors={activeColors}
+                onDatePress={() => setCalendarVisible(true)}
+            />
 
             <SyncStatusBanner isSyncing={isSyncing} syncProgress={syncProgress} lang={lang} activeColors={activeColors} />
 
@@ -94,6 +106,13 @@ const HomeScreen = ({ onSelectSurah, lang, theme, refreshTrigger }: Props) => {
                 renderItem={({ item }) => (
                     <SurahCard surah={item} onPress={() => onSelectSurah(item.number, item.englishName, item.name)} lang={lang} theme={theme} />
                 )}
+            />
+
+            <CalendarModal
+                visible={isCalendarVisible}
+                onClose={() => setCalendarVisible(false)}
+                lang={lang as 'en' | 'ar'}
+                activeColors={activeColors}
             />
         </SafeAreaView>
     );

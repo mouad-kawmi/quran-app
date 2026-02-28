@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Colors } from '../constants/Colors';
 import { Surah } from '../api/quranApi';
 
@@ -21,23 +21,30 @@ const SurahCard: React.FC<SurahCardProps> = ({ surah, onPress, lang, theme }) =>
 
     return (
         <TouchableOpacity
-            style={[styles.container, { backgroundColor: activeColors.surface }]}
+            style={[styles.container, { backgroundColor: activeColors.surface, borderColor: activeColors.border }]}
             onPress={onPress}
+            activeOpacity={0.7}
         >
             <View style={styles.leftSection}>
-                <View style={[styles.numberContainer, { backgroundColor: 'rgba(212, 175, 55, 0.1)' }]}>
-                    <Text style={[styles.number, { color: Colors.secondary }]}>{surah.number}</Text>
+                <View style={styles.numberBadge}>
+                    <Text style={styles.number}>{surah.number}</Text>
                 </View>
                 <View style={styles.infoContainer}>
-                    <Text style={[styles.englishName, { color: activeColors.text }]} numberOfLines={1}>{surah.englishName}</Text>
-                    <Text style={[styles.translation, { color: activeColors.textMuted }]} numberOfLines={1}>
-                        {isAr ? surah.englishNameTranslation : surah.englishNameTranslation}
+                    <Text style={[styles.englishName, { color: activeColors.text }]} numberOfLines={1}>
+                        {isAr ? surah.name.replace('سُورَةُ ', '') : surah.englishName}
                     </Text>
+                    <View style={styles.metaRow}>
+                        <Text style={[styles.metaText, { color: activeColors.textMuted }]}>
+                            {revType} • {surah.numberOfAyahs} {isAr ? 'آية' : 'Ayahs'}
+                        </Text>
+                    </View>
                 </View>
             </View>
+
             <View style={styles.rightSection}>
-                <Text style={[styles.arabicName, { color: Colors.secondary }]} numberOfLines={1}>{surah.name}</Text>
-                <Text style={[styles.ayahCount, { color: activeColors.textMuted }]}>{surah.numberOfAyahs} {isAr ? 'آية' : 'Ayahs'}</Text>
+                <Text style={[styles.arabicName, { color: activeColors.text }]} numberOfLines={1}>
+                    {surah.name}
+                </Text>
             </View>
         </TouchableOpacity>
     );
@@ -48,52 +55,69 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginHorizontal: 16,
-        marginVertical: 8,
-        padding: 16,
-        borderRadius: 12,
+        marginHorizontal: 4,
+        marginVertical: 6,
+        padding: 18,
+        borderRadius: 16,
+        borderWidth: 1,
         shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
-        elevation: 1
+        shadowRadius: 5,
+        elevation: 2,
     },
     leftSection: {
         flexDirection: 'row',
         alignItems: 'center',
+        flex: 1,
     },
-    numberContainer: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+    numberBadge: {
+        width: 42,
+        height: 42,
+        borderRadius: 8,
+        backgroundColor: 'rgba(212, 175, 55, 0.08)',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12,
+        marginRight: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(212, 175, 55, 0.3)',
+        transform: [{ rotate: '45deg' }]
     },
     number: {
         fontSize: 14,
-        fontWeight: 'bold'
+        fontWeight: 'bold',
+        color: Colors.secondary,
+        transform: [{ rotate: '-45deg' }]
     },
     infoContainer: {
         justifyContent: 'center',
+        flex: 1,
     },
     englishName: {
-        fontSize: 16,
-        fontWeight: '600'
+        fontSize: 17,
+        fontWeight: '700',
+        marginBottom: 4,
+        letterSpacing: 0.3,
     },
-    translation: {
+    metaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    metaText: {
         fontSize: 12,
-        marginTop: 2,
+        fontWeight: '500',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     rightSection: {
         alignItems: 'flex-end',
-        flex: 1,
+        marginLeft: 15,
     },
     arabicName: {
-        fontSize: 18,
+        fontSize: 22,
         fontWeight: 'bold',
-    },
-    ayahCount: {
-        fontSize: 12,
-        marginTop: 2,
+        fontFamily: Platform.OS === 'ios' ? 'Amiri' : 'serif',
+        color: Colors.secondary,
     },
 });
 

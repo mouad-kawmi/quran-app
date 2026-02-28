@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Switch, Alert, ScrollView, Modal, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, Switch, Alert, ScrollView, Modal, TouchableOpacity, Linking } from 'react-native';
 import { Translations } from '../constants/Translations';
 import { Colors } from '../constants/Colors';
 import { Storage } from '../utils/storage';
-import { Trash2, X, CheckCircle, Download, Sun, BookOpen, Clock } from 'lucide-react-native';
+import { Trash2, X, CheckCircle, Download, Sun, BookOpen, Clock, AlertCircle } from 'lucide-react-native';
 import * as Notifications from 'expo-notifications';
 import axios from 'axios';
 import SettingItem from '../components/settings/SettingItem';
 import { Audio } from 'expo-av';
+import { NotificationService } from '../utils/notificationService';
+import { Bell } from 'lucide-react-native';
 
 const RECITERS = [
     { id: 'Alafasy_128kbps', nameAr: 'مشاري العفاسي', nameEn: 'Mishary Al-Afasy' },
@@ -67,11 +69,13 @@ const SettingsScreen = ({ lang, theme, onToggleLang, onToggleTheme, reciter, set
         <SafeAreaView style={[styles.container, { backgroundColor: activeColors.background }]}>
             <View style={[styles.header, { backgroundColor: activeColors.surface }]}><Text style={[styles.title, { color: Colors.secondary }]}>{t.settings}</Text></View>
             <ScrollView contentContainerStyle={{ padding: 20 }}>
-                <SettingItem label={t.language} value={lang === 'ar' ? 'العربية' : 'English'} onPress={onToggleLang} activeColors={activeColors} />
-                <SettingItem label={lang === 'ar' ? 'المظهر الليلي' : 'Dark Mode'} activeColors={activeColors}>
+                <SettingItem label={t.language} value={lang === 'ar' ? 'العربية' : 'English'} onPress={onToggleLang} activeColors={activeColors} btnText={lang === 'ar' ? 'تغيير' : 'Change'} isAr={lang === 'ar'} />
+                <SettingItem label={lang === 'ar' ? 'المظهر الليلي' : 'Dark Mode'} activeColors={activeColors} isAr={lang === 'ar'}>
                     <Switch value={theme === 'dark'} onValueChange={onToggleTheme} trackColor={{ true: Colors.secondary }} />
                 </SettingItem>
-                <SettingItem label={lang === 'ar' ? 'القارئ' : 'Reciter'} value={RECITERS.find(r => r.id === reciter)?.[lang === 'ar' ? 'nameAr' : 'nameEn']} onPress={() => setModal(true)} activeColors={activeColors} />
+                <SettingItem label={lang === 'ar' ? 'القارئ' : 'Reciter'} value={RECITERS.find(r => r.id === reciter)?.[lang === 'ar' ? 'nameAr' : 'nameEn']} onPress={() => setModal(true)} activeColors={activeColors} btnText={lang === 'ar' ? 'تغيير' : 'Change'} isAr={lang === 'ar'} />
+
+                <SettingItem label={lang === 'ar' ? 'اختبار الإشعارات' : 'Test Notifications'} value={lang === 'ar' ? 'إرسال إشعار تجريبي بعد ثانيتين' : 'Send test notification in 2s'} onPress={() => NotificationService.testNotification(lang)} activeColors={activeColors} btnText={lang === 'ar' ? 'إرسال' : 'Send'} isAr={lang === 'ar'} />
 
                 <View style={[styles.card, { backgroundColor: activeColors.surface, borderColor: sync.done ? '#4CAF50' : activeColors.border }]}>
                     <Text style={[styles.cardTitle, { color: activeColors.text }]}>{lang === 'ar' ? 'تحميل كامل' : 'Full Download'}</Text>
